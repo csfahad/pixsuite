@@ -107,7 +107,7 @@ export default function Navbar() {
                         height: isMobileMenuOpen ? "auto" : 0,
                         opacity: isMobileMenuOpen ? 1 : 0,
                     }}
-                    className="md:hidden overflow-hidden"
+                    className="md:hidden overflow-hidden inset-0 bg-linear-to-br from-background via-background to-background opacity-50 p-3 mt-3 rounded-lg"
                 >
                     <div className="py-4 space-y-4">
                         <button

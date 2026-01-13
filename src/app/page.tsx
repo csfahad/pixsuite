@@ -1,5 +1,9 @@
-import Image from "next/image";
+import Hero from "@/modules/hero";
 
 export default function Home() {
-    return <div className="flex bg-accent"></div>;
+    return (
+        <div className="">
+            <Hero />
+        </div>
+    );
 }
