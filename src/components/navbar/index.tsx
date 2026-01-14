@@ -69,19 +69,19 @@ export default function Navbar() {
                     <div className="hidden md:flex items-center space-x-8 shrink-0">
                         <button
                             onClick={() => scrollToSection("features")}
-                            className="text-foreground hover:text-primary transition-colors font-medium"
+                            className="text-foreground hover:text-primary transition-colors font-medium cursor-pointer"
                         >
                             Features
                         </button>
                         <button
                             onClick={() => scrollToSection("pricing")}
-                            className="text-foreground hover:text-primary transition-colors font-medium"
+                            className="text-foreground hover:text-primary transition-colors font-medium cursor-pointer"
                         >
                             Pricing
                         </button>
                         <Button
                             variant="outline"
-                            className="font-semibold"
+                            className="font-semibold cursor-pointer"
                             onClick={handleSubmit}
                         >
                             {session?.user ? "Launch App" : "Sign In"}
