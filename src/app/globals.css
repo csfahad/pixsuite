@@ -182,4 +182,57 @@
         @apply bg-background text-foreground;
         letter-spacing: var(--tracking-normal);
     }
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: var(--color-muted);
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--color-primary);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: hsl(192 100% 70%);
+    }
+}
+
+/* ===== UTILITIES (ported helpers) ===== */
+@layer utilities {
+    .glass {
+        background: hsl(220 27% 8% / 0.1);
+        backdrop-filter: blur(20px);
+        border: 1px solid hsl(220 27% 12% / 0.2);
+    }
+
+    .glass-border {
+        background: var(--gradient-border);
+        padding: 1px;
+        border-radius: inherit;
+    }
+
+    .bg-gradient-primary {
+        background: var(--gradient-primary);
+    }
+    .bg-gradient-glass {
+        background: var(--gradient-glass);
+    }
+
+    .shadow-glow-primary {
+        box-shadow: var(--glow-primary);
+    }
+    .shadow-glow-secondary {
+        box-shadow: var(--glow-secondary);
+    }
+    .shadow-glow-subtle {
+        box-shadow: var(--glow-subtle);
+    }
+
+    .transition-smooth {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .transition-bounce {
+        transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
 }

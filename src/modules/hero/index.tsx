@@ -19,7 +19,7 @@ export default function Hero() {
                 className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20"
             >
                 {/* Background Gradient */}
-                <div className="absolute inset-0 bg-linear-to-br from-background via-background to-muted opacity-50" />
+                <div className="absolute inset-0 bg-linear-to-br from-accent via-background to-muted opacity-50" />
 
                 {/* Floating orbs */}
                 <div className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-float" />
@@ -54,7 +54,7 @@ export default function Hero() {
                             transition={{ delay: 0.3 }}
                             className="text-5xl lg:text-8xl font-bold leading-tight"
                         >
-                            <span className="bg-primary bg-clip-text! text-transparent">
+                            <span className="bg-primary bg-clip-text! text-transparent tracking-wide">
                                 PixSuite
                             </span>
                         </motion.h1>

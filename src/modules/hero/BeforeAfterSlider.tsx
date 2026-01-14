@@ -95,7 +95,7 @@ export default function BeforeAfterSlider() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1 }}
-                className="text-center mt-4 text-sm text-muted-foreground"
+                className="text-center mt-4 text-sm text-muted-foreground mb-3"
             >
                 Drag the slider to see the magic
             </motion.p>
