@@ -39,9 +39,9 @@ export default function Navbar() {
         <motion.nav
             initial={{ y: -100 }}
             animate={{ y: 0 }}
-            className={`fixed top-1 left-0 right-0 z-50 ${
+            className={`fixed top-0 md:top-1 left-0 right-0 z-50 ${
                 isScrolled
-                    ? "fixed top-2 left-1/2 z-50 -translate-x-1/2 rounded-lg w-full max-w-6xl glass border border-card-border backdrop-blur-glass"
+                    ? "fixed top-0 md:top-2 left-1/2 z-50 -translate-x-1/2 rounded-none md:rounded-lg w-full max-w-6xl glass border border-card-border backdrop-blur-glass"
                     : "bg-transparent"
             }`}
         >
