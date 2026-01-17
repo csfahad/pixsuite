@@ -73,7 +73,7 @@ export default function Pricing() {
                             Magic Plan
                         </span>
                     </h2>
-                    <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+                    <p className="text-base md:text-xl text-muted-foreground max-w-3xl mx-auto">
                         Start free, upgrade when you need more. No hidden fees,
                         cancel anytime.
                     </p>
