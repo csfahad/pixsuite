@@ -115,7 +115,7 @@ export default function Features() {
                         </span>
                     </h2>
 
-                    <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+                    <p className="text-base md:text-xl text-muted-foreground max-w-3xl mx-auto">
                         Transform your photos with cutting-edge AI technology.
                         Each feature is designed to give you professional
                         results in seconds, not hours.
