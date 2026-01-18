@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Crown, ImageIcon, Loader2, Upload, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
     ImageKitInvalidRequestError,
     ImageKitServerError,
     ImageKitUploadNetworkError,
     upload,
 } from "@imagekit/next";
+import { Button } from "@/components/ui/button";
+import PaymentModal from "@/components/modals/payment-modal";
 
 interface UploadZoneProps {
     onImageUpload: (imageUrl: string) => void;
@@ -84,8 +85,7 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                 onProgress: (event) => {
                     // update progress if needed
                     console.log(
-                        `Upload progress: ${
-                            (event.loaded / event.total) * 100
+                        `Upload progress: ${(event.loaded / event.total) * 100
                         }%`
                     );
                 },
@@ -198,11 +198,10 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    className={`shadow-glass rounded-lg p-8 border-2 border-dashed border-primary-800 transition-all duration-300 cursor-pointer ${
-                        isDragOver
-                            ? "border-primary bg-primary/5 scale-105"
-                            : "border-card-border hover:border-primary/50 hover:bg-primary/5"
-                    }`}
+                    className={`shadow-glass rounded-lg p-8 border-2 border-dashed border-primary-800 transition-all duration-300 cursor-pointer ${isDragOver
+                        ? "border-primary bg-primary/5 scale-105"
+                        : "border-card-border hover:border-primary/50 hover:bg-primary/5"
+                        }`}
                 >
                     <input
                         type="file"
@@ -235,8 +234,8 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                             {isUploading
                                 ? "Uploading to cloud..."
                                 : isDragOver
-                                ? "Drop your photo here"
-                                : "Upload Photo"}
+                                    ? "Drop your photo here"
+                                    : "Upload Photo"}
                         </h3>
 
                         <p className="text-muted-foreground text-sm mb-4">
@@ -282,8 +281,9 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                     </p>
                 </div>
             )}
+
             {/* Payment Modal */}
-            {/* <PaymentModal
+            <PaymentModal
                 isOpen={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
                 onUpgrade={() => {
@@ -291,7 +291,7 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                 }}
                 usageCount={usageData?.usageCount || 0}
                 usageLimit={usageData?.usageLimit || 3}
-            /> */}
+            />
         </motion.div>
     );
 }
