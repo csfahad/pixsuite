@@ -19,24 +19,24 @@ enum Plan {
 }
 
 model users {
-    id               String   @id @default(auto()) @map("_id") @db.ObjectId
-    name             String
-    email            String   @unique
-    avatar           String?
-    stripeCustomerId String?
-    plan             Plan     @default(Free)
-    role             Role     @default(User)
-    usageCount       Int      @default(0)
-    usageLimit       Int      @default(3)
-    createdAt        DateTime @default(now())
-    updatedAt        DateTime @updatedAt
+    id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+    name               String
+    email              String   @unique
+    avatar             String?
+    razorpayCustomerId String?
+    plan               Plan     @default(Free)
+    role               Role     @default(User)
+    usageCount         Int      @default(0)
+    usageLimit         Int      @default(3)
+    createdAt          DateTime @default(now())
+    updatedAt          DateTime @updatedAt
 }
 
 model subscriptions {
-    id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-    userId               String   @db.ObjectId
-    stripeSubscriptionId String
-    stripeCustomerId     String
-    createdAt            DateTime @default(now())
-    updatedAt            DateTime @updatedAt
+    id                     String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId                 String   @db.ObjectId
+    razorpaySubscriptionId String
+    razorpayCustomerId     String
+    createdAt              DateTime @default(now())
+    updatedAt              DateTime @updatedAt
 }
