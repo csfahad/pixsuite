@@ -19,6 +19,15 @@ export const metadata: Metadata = {
     title: "PixSuite",
     description:
         "Edit photos, generate AI images, and bring your ideas to life with Next.js-powered PixSuite AI photo editor and prompt-based image generator.",
+    icons: {
+        icon: [
+            { url: "/favicon.ico" },
+            { url: "/favicon.svg", type: "image/svg+xml" },
+            { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+        ],
+        apple: "/apple-touch-icon.png",
+    },
+    manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({
