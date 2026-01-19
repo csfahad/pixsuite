@@ -1,0 +1,68 @@
+import Razorpay from "razorpay";
+import { getToken } from "next-auth/jwt";
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID!,
+    key_secret: process.env.RAZORPAY_KEY_SECRET!,
+});
+
+export async function POST(request: NextRequest) {
+    try {
+        const token = await getToken({ req: request });
+
+        if (!token?.email) {
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
+        }
+
+        const user = await prisma.users.findUnique({
+            where: { email: token.email as string },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+            },
+        });
+
+        if (!user) {
+            return NextResponse.json(
+                { error: "User not found" },
+                { status: 404 }
+            );
+        }
+
+        const amount = 99900;
+        const receipt = `rcpt_${user.id.slice(-10)}_${Date.now().toString().slice(-8)}`;
+
+        // create razorpay order
+        const options = {
+            amount: amount,
+            currency: "INR",
+            receipt: receipt,
+            notes: {
+                userId: user.id,
+                userEmail: user.email,
+                plan: "Pro",
+            },
+        };
+
+        const order = await razorpay.orders.create(options);
+
+        return NextResponse.json({
+            orderId: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            key: process.env.RAZORPAY_KEY_ID!,
+        });
+    } catch (err: any) {
+        console.error("Razorpay order creation error:", err);
+        return NextResponse.json(
+            { error: "Failed to create order", details: err.message },
+            { status: 500 }
+        );
+    }
+}
