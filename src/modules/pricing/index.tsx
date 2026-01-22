@@ -15,27 +15,44 @@ const plans = [
             "Standard resolution output",
             "Community support",
         ],
-        limitations: ["Limited daily usage"],
+        limitations: ["Limited usage"],
         cta: "Start Free",
         popular: false,
         icon: Star,
     },
     {
+        name: "Lite",
+        price: "$9",
+        period: "per month",
+        description: "For growing creators with higher needs",
+        features: [
+            "1000 edits(uploads)/month",
+            "All AI features unlocked",
+            "High resolution output",
+            "Up to 20 GB bandwidth/month",
+            "Email support",
+        ],
+        cta: "Go Lite",
+        popular: true,
+        icon: Zap,
+    },
+    {
         name: "Pro",
-        price: "$19",
+        price: "$29",
         period: "per month",
         description: "Unlimited power for professionals",
         features: [
             "Unlimited edits",
             "All AI features unlocked",
             "Up to 4K resolution",
+            "Up to 100 GB bandwidth/month",
             "Priority support",
-            "Batch processing",
             "API access",
-            "Commercial license",
+            "Early access to new features",
         ],
         cta: "Go Pro",
-        popular: true,
+        popular: false,
+        proPopular: true,
         icon: Crown,
     },
 ];
@@ -79,7 +96,7 @@ export default function Pricing() {
                     </p>
                 </motion.div>
 
-                <div className="grid lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
                     {plans?.map((plan, index) => (
                         <motion.div
                             key={plan.name}
@@ -88,9 +105,8 @@ export default function Pricing() {
                             viewport={{ once: true }}
                             transition={{ duration: 0.8, delay: index * 0.2 }}
                             whileHover={{ scale: 1.02, y: -5 }}
-                            className={`relative group ${
-                                plan.popular ? "lg:-mt-8" : ""
-                            }`}
+                            className={`relative group ${plan.popular ? "lg:-mt-8" : ""
+                                }`}
                         >
                             {plan.popular && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
@@ -100,12 +116,19 @@ export default function Pricing() {
                                 </div>
                             )}
 
+                            {plan.proPopular && (
+                                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+                                    <div className="bg-primary px-6 py-2 rounded-lg text-sm font-bold text-background">
+                                        Popular
+                                    </div>
+                                </div>
+                            )}
+
                             <div
-                                className={`h-full glass rounded-xl p-8 border transition-all duration-300 ${
-                                    plan.popular
-                                        ? "border-primary/50 shadow-glow-primary"
-                                        : "border-card-border hover:border-primary/30 shadow-glow-subtle hover:shadow-glow-primary"
-                                }`}
+                                className={`h-full glass rounded-xl p-8 border transition-all duration-300 ${plan.popular
+                                    ? "border-primary/50 shadow-glow-primary"
+                                    : "hover:border-primary/30 shadow-glow-subtle hover:shadow-glow-primary"
+                                    }`}
                             >
                                 <div className="text-center mb-8">
                                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-linear-to-br from-secondary to-secondary group-hover:animate-glow-pulse">
