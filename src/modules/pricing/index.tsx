@@ -232,8 +232,19 @@ export default function Pricing() {
                                     }
                                     className="w-[90%] font-semibold cursor-pointer absolute left-1/2 -translate-x-1/2 bottom-4 rounded-lg mb-2"
                                     onClick={() => handlePlanClick(plan.name)}
+                                    disabled={Boolean(
+                                        plan.name === "Free" &&
+                                        usageData !== null &&
+                                        usageData.plan === "Free" &&
+                                        usageData.canUpload === false
+                                    )}
                                 >
-                                    {plan.cta}
+                                    {plan.name === "Free" &&
+                                        usageData !== null &&
+                                        usageData.plan === "Free" &&
+                                        usageData.canUpload === false
+                                        ? "Limit Reached"
+                                        : plan.cta}
                                 </Button>
                             </div>
                         </motion.div>
