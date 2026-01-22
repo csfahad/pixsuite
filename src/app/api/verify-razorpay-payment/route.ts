@@ -1,7 +1,13 @@
 import crypto from "crypto";
+import Razorpay from "razorpay";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID!,
+    key_secret: process.env.RAZORPAY_KEY_SECRET!,
+});
 
 export async function POST(request: NextRequest) {
     try {
@@ -50,11 +56,19 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // get plan from order notes
+        const order = await razorpay.orders.fetch(razorpay_order_id);
+        const planType = order.notes?.plan || "Pro";
+
+        // set usage limit based on plan
+        const usageLimit = planType === "Lite" ? 1000 : 10000;
+
         // update user plan to Paid
         await prisma.users.update({
             where: { id: user.id },
             data: {
                 plan: "Paid",
+                usageLimit: usageLimit,
                 razorpayCustomerId: razorpay_payment_id,
             },
         });
@@ -85,7 +99,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: "Payment verified and Pro Plan activated",
+            message: `Payment verified and ${planType} Plan activated`,
         });
     } catch (err: any) {
         console.error("Payment verification error:", err);

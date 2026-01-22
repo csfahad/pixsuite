@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
             try {
                 const order = await razorpay.orders.fetch(orderId);
                 const userId = order.notes?.userId;
+                const planType = order.notes?.plan || "Lite";
 
                 if (!userId) {
                     console.error("User ID not found in order notes");
@@ -71,11 +72,15 @@ export async function POST(request: NextRequest) {
                     );
                 }
 
+                // set usage limit based on plan
+                const usageLimit = planType === "Lite" ? 1000 : 10000;
+
                 // update user plan to Paid
                 await prisma.users.update({
                     where: { id: user.id },
                     data: {
                         plan: "Paid",
+                        usageLimit: usageLimit,
                         razorpayCustomerId: paymentId,
                     },
                 });
@@ -104,7 +109,7 @@ export async function POST(request: NextRequest) {
                     });
                 }
 
-                console.log(`Payment captured and Pro Plan activated for user: ${userIdString}`);
+                console.log(`Payment captured and ${planType} Plan activated for user: ${userIdString}`);
                 return NextResponse.json({ success: true });
             } catch (err: any) {
                 console.error("Error processing payment.captured event:", err);
@@ -153,6 +158,7 @@ export async function POST(request: NextRequest) {
                         where: { id: user.id },
                         data: {
                             plan: "Free",
+                            usageLimit: 3,
                         },
                     });
 

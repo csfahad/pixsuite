@@ -35,7 +35,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const amount = 99900;
+        // get plan from request body
+        const body = await request.json().catch(() => ({}));
+        
+        const planType = body.plan || "Lite";
+        const amount = planType === "Lite" ? 99900 : 290000;
+
         const receipt = `rcpt_${user.id.slice(-10)}_${Date.now().toString().slice(-8)}`;
 
         // create razorpay order
@@ -46,7 +51,7 @@ export async function POST(request: NextRequest) {
             notes: {
                 userId: user.id,
                 userEmail: user.email,
-                plan: "Pro",
+                plan: planType,
             },
         };
 
