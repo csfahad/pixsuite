@@ -111,8 +111,13 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
             setIsUploading(true);
 
             try {
-                await checkUsage();
+                const usage = await checkUsage();
 
+                if (!usage.canUpload) {
+                    setShowPaymentModal(true);
+                    setIsUploading(false);
+                    return;
+                }
                 await updateUsage();
 
                 // upload to imagekit
@@ -152,6 +157,11 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
         const data = await response.json();
         setUsageData(data);
         return data;
+    };
+
+    const handlePaymentModalClose = () => {
+        setShowPaymentModal(false);
+        checkUsage().catch(console.error);
     };
 
     const clearImage = () => {
@@ -285,9 +295,10 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
             {/* Payment Modal */}
             <PaymentModal
                 isOpen={showPaymentModal}
-                onClose={() => setShowPaymentModal(false)}
+                onClose={handlePaymentModalClose}
                 onUpgrade={() => {
-                    setShowPaymentModal(false);
+                    handlePaymentModalClose();
+                    checkUsage().catch(console.error);
                 }}
                 usageCount={usageData?.usageCount || 0}
                 usageLimit={usageData?.usageLimit || 3}

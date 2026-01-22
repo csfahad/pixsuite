@@ -15,6 +15,7 @@ interface PaymentModalProps {
     onUpgrade: () => void;
     usageCount: number;
     usageLimit: number;
+    plan?: "Lite" | "Pro";
 }
 
 export default function PaymentModal({
@@ -23,6 +24,7 @@ export default function PaymentModal({
     onUpgrade,
     usageCount,
     usageLimit,
+    plan = "Lite",
 }: PaymentModalProps) {
 
     const [isLoading, setIsLoading] = useState(false);
@@ -44,12 +46,15 @@ export default function PaymentModal({
     const handleUpgrade = async () => {
         setIsLoading(true);
         try {
-            // create razorpay order
+            // create razorpay order with plan type
             const response = await fetch("/api/create-razorpay-order", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
+                body: JSON.stringify({
+                    plan: plan,
+                }),
             });
 
             if (!response.ok) {
@@ -72,7 +77,7 @@ export default function PaymentModal({
                 amount: amount,
                 currency: currency,
                 name: "PixSuite",
-                description: "Pro Plan Subscription",
+                description: `${plan} Plan Subscription`,
                 order_id: orderId,
                 handler: async function (response: any) {
                     try {
@@ -99,7 +104,7 @@ export default function PaymentModal({
                             // call onUpgrade callback to refresh user data
                             onUpgrade();
                             onClose();
-                            alert("Payment successful! Your Pro plan is now active.");
+                            alert(`Payment successful! Your ${plan} plan is now active.`);
                         } else {
                             throw new Error("Payment verification failed");
                         }
@@ -157,10 +162,14 @@ export default function PaymentModal({
                         {/* Header */}
                         <div className="text-center mb-6">
                             <div className="w-16 h-16 mx-auto mb-4 bg-primary rounded-full flex items-center justify-center">
-                                <Crown className="h-8 w-8 text-primary-foreground" />
+                                {plan === "Pro" ? (
+                                    <Crown className="h-8 w-8 text-primary-foreground" />
+                                ) : (
+                                    <Zap className="h-8 w-8 text-primary-foreground" />
+                                )}
                             </div>
                             <h2 className="text-2xl font-bold text-foreground mb-2">
-                                Upgrade to Pro
+                                Upgrade to {plan}
                             </h2>
                             <p className="text-muted-foreground">
                                 You've used {usageCount}/{usageLimit} free uploads
@@ -169,54 +178,96 @@ export default function PaymentModal({
 
                         {/* Features */}
                         <div className="space-y-4 mb-6">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                    <Check className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="font-medium text-foreground">
-                                        Unlimited Uploads
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        No more usage limits
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                    <Zap className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="font-medium text-foreground">
-                                        Priority Processing
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Faster AI processing
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                    <Star className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="font-medium text-foreground">Premium Effects</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Access to advanced AI tools
-                                    </p>
-                                </div>
-                            </div>
+                            {plan === "Pro" ? (
+                                <>
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                                            <Check className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground">
+                                                Unlimited Uploads
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                No more usage limits
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                                            <Zap className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground">
+                                                Priority Processing
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                Faster AI processing
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                                            <Star className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground">Premium Effects</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                Access to advanced AI tools
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                                            <Check className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground">
+                                                1000 Uploads/Month
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                More than enough for most users
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                                            <Zap className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground">
+                                                All AI Features
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                Unlock all AI tools
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                                            <Star className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground">High Resolution</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                High quality output
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Pricing */}
                         <div className="bg-accent/80 rounded-xl p-4 mb-6">
                             <div className="text-center">
-                                <p className="text-sm text-muted-foreground">Pro Plan</p>
+                                <p className="text-sm text-muted-foreground">{plan} Plan</p>
                                 <div className="flex items-center justify-center space-x-2">
                                     <span className="text-3xl font-bold text-foreground">
-                                        $19
+                                        {plan === "Pro" ? "₹2,900" : "₹999"}
                                     </span>
                                     <span className="text-muted-foreground">/month</span>
                                 </div>
@@ -237,8 +288,12 @@ export default function PaymentModal({
                                     </>
                                 ) : (
                                     <>
-                                        <Crown className="h-4 w-4 mr-2" />
-                                        Start Pro Plan
+                                        {plan === "Pro" ? (
+                                            <Crown className="h-4 w-4 mr-2" />
+                                        ) : (
+                                            <Zap className="h-4 w-4 mr-2" />
+                                        )}
+                                        Start {plan} Plan
                                     </>
                                 )}
                             </Button>

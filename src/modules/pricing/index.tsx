@@ -1,7 +1,9 @@
 "use client";
+import { useState, useEffect } from "react";
 import { Check, Crown, Star, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import PaymentModal from "@/components/modals/payment-modal";
 
 const plans = [
     {
@@ -58,11 +60,51 @@ const plans = [
 ];
 
 export default function Pricing() {
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [selectedPlan, setSelectedPlan] = useState<"Lite" | "Pro">("Lite");
+    const [usageData, setUsageData] = useState<{
+        usageCount: number;
+        usageLimit: number;
+        plan: string;
+        canUpload: boolean;
+    } | null>(null);
+
+    useEffect(() => {
+        checkUsage().catch(console.error);
+    }, []);
+
+    const checkUsage = async () => {
+        try {
+            const response = await fetch("/api/usage");
+            if (response.ok) {
+                const data = await response.json();
+                setUsageData(data);
+                return data;
+            }
+        } catch (err) {
+            console.error("Failed to check usage:", err);
+        }
+    };
+
     const scrollToEditor = () => {
         const element = document.getElementById("editor");
         if (element) {
             element.scrollIntoView({ behavior: "smooth" });
         }
+    };
+
+    const handlePlanClick = (planName: string) => {
+        if (planName === "Free") {
+            scrollToEditor();
+        } else {
+            setSelectedPlan(planName as "Lite" | "Pro");
+            setShowPaymentModal(true);
+        }
+    };
+
+    const handlePaymentModalClose = () => {
+        setShowPaymentModal(false);
+        checkUsage().catch(console.error);
     };
 
     return (
@@ -189,7 +231,7 @@ export default function Pricing() {
                                         plan.popular ? "default" : "outline"
                                     }
                                     className="w-[90%] font-semibold cursor-pointer absolute left-1/2 -translate-x-1/2 bottom-4 rounded-lg mb-2"
-                                    onClick={scrollToEditor}
+                                    onClick={() => handlePlanClick(plan.name)}
                                 >
                                     {plan.cta}
                                 </Button>
@@ -211,6 +253,19 @@ export default function Pricing() {
                     </p>
                 </motion.div>
             </div>
+
+            {/* Payment Modal */}
+            <PaymentModal
+                isOpen={showPaymentModal}
+                onClose={handlePaymentModalClose}
+                onUpgrade={() => {
+                    handlePaymentModalClose();
+                    checkUsage().catch(console.error);
+                }}
+                usageCount={usageData?.usageCount || 0}
+                usageLimit={usageData?.usageLimit || 3}
+                plan={selectedPlan}
+            />
         </section>
     );
 }
