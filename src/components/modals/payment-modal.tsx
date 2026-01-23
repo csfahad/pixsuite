@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Crown, Star, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,8 +27,12 @@ export default function PaymentModal({
     usageLimit,
     plan = "Lite",
 }: PaymentModalProps) {
-
     const [isLoading, setIsLoading] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // load razorpay checkout script
     useEffect(() => {
@@ -68,7 +73,9 @@ export default function PaymentModal({
             }
 
             if (!window.Razorpay) {
-                throw new Error("Razorpay checkout not loaded. Please try again.");
+                throw new Error(
+                    "Razorpay checkout not loaded. Please try again.",
+                );
             }
 
             // open razorpay checkout
@@ -82,17 +89,23 @@ export default function PaymentModal({
                 handler: async function (response: any) {
                     try {
                         // verify payment on server
-                        const verifyResponse = await fetch("/api/verify-razorpay-payment", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
+                        const verifyResponse = await fetch(
+                            "/api/verify-razorpay-payment",
+                            {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                    razorpay_order_id:
+                                        response.razorpay_order_id,
+                                    razorpay_payment_id:
+                                        response.razorpay_payment_id,
+                                    razorpay_signature:
+                                        response.razorpay_signature,
+                                }),
                             },
-                            body: JSON.stringify({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                            }),
-                        });
+                        );
 
                         if (!verifyResponse.ok) {
                             throw new Error("Payment verification failed");
@@ -104,13 +117,17 @@ export default function PaymentModal({
                             // call onUpgrade callback to refresh user data
                             onUpgrade();
                             onClose();
-                            alert(`Payment successful! Your ${plan} plan is now active.`);
+                            alert(
+                                `Payment successful! Your ${plan} plan is now active.`,
+                            );
                         } else {
                             throw new Error("Payment verification failed");
                         }
                     } catch (err) {
                         console.error("Payment verification error:", err);
-                        alert("Payment verification failed. Please contact support.");
+                        alert(
+                            "Payment verification failed. Please contact support.",
+                        );
                     } finally {
                         setIsLoading(false);
                     }
@@ -134,7 +151,9 @@ export default function PaymentModal({
         }
     };
 
-    return (
+    if (!mounted) return null;
+
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <motion.div
@@ -172,7 +191,8 @@ export default function PaymentModal({
                                 Upgrade to {plan}
                             </h2>
                             <p className="text-muted-foreground">
-                                You've used {usageCount}/{usageLimit} free uploads
+                                You've used {usageCount}/{usageLimit} free
+                                uploads
                             </p>
                         </div>
 
@@ -211,7 +231,9 @@ export default function PaymentModal({
                                             <Star className="h-4 w-4 text-primary" />
                                         </div>
                                         <div>
-                                            <p className="font-medium text-foreground">Premium Effects</p>
+                                            <p className="font-medium text-foreground">
+                                                Premium Effects
+                                            </p>
                                             <p className="text-sm text-muted-foreground">
                                                 Access to advanced AI tools
                                             </p>
@@ -251,7 +273,9 @@ export default function PaymentModal({
                                             <Star className="h-4 w-4 text-primary" />
                                         </div>
                                         <div>
-                                            <p className="font-medium text-foreground">High Resolution</p>
+                                            <p className="font-medium text-foreground">
+                                                High Resolution
+                                            </p>
                                             <p className="text-sm text-muted-foreground">
                                                 High quality output
                                             </p>
@@ -264,12 +288,16 @@ export default function PaymentModal({
                         {/* Pricing */}
                         <div className="bg-accent/80 rounded-xl p-4 mb-6">
                             <div className="text-center">
-                                <p className="text-sm text-muted-foreground">{plan} Plan</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {plan} Plan
+                                </p>
                                 <div className="flex items-center justify-center space-x-2">
                                     <span className="text-3xl font-bold text-foreground">
                                         {plan === "Pro" ? "₹2,900" : "₹999"}
                                     </span>
-                                    <span className="text-muted-foreground">/month</span>
+                                    <span className="text-muted-foreground">
+                                        /month
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -333,6 +361,7 @@ export default function PaymentModal({
                     </motion.div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body,
     );
 }
