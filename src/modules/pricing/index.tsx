@@ -67,6 +67,7 @@ export default function Pricing() {
         usageLimit: number;
         plan: string;
         canUpload: boolean;
+        subscriptionExpiresAt?: string | null;
     } | null>(null);
 
     useEffect(() => {
@@ -96,10 +97,56 @@ export default function Pricing() {
     const handlePlanClick = (planName: string) => {
         if (planName === "Free") {
             scrollToEditor();
-        } else {
-            setSelectedPlan(planName as "Lite" | "Pro");
-            setShowPaymentModal(true);
+            return;
         }
+
+        const currentPlan = usageData?.plan || "Free";
+        const isSubscriptionActive = usageData?.subscriptionExpiresAt
+            ? new Date(usageData.subscriptionExpiresAt) > new Date()
+            : false;
+
+        // prevent duplicate subscriptions
+        if (currentPlan === planName && isSubscriptionActive) {
+            return;
+        }
+
+        // prevent downgrades
+        if (currentPlan === "Pro" && planName === "Lite") {
+            return;
+        }
+        if ((currentPlan === "Pro" || currentPlan === "Lite") && planName === "Free") {
+            return;
+        }
+
+        setSelectedPlan(planName as "Lite" | "Pro");
+        setShowPaymentModal(true);
+    };
+
+    const isPlanActive = (planName: string) => {
+        if (!usageData) return false;
+        const currentPlan = usageData.plan;
+        const isSubscriptionActive = usageData.subscriptionExpiresAt
+            ? new Date(usageData.subscriptionExpiresAt) > new Date()
+            : false;
+        return currentPlan === planName && isSubscriptionActive;
+    };
+
+    const canUpgradeToPlan = (planName: string) => {
+        if (!usageData) return true;
+        const currentPlan = usageData.plan;
+        const isSubscriptionActive = usageData.subscriptionExpiresAt
+            ? new Date(usageData.subscriptionExpiresAt) > new Date()
+            : false;
+
+        if (currentPlan === planName && isSubscriptionActive) {
+            return false;
+        }
+
+        // prevent downgrades
+        if (currentPlan === "Pro" && planName === "Lite") return false;
+        if ((currentPlan === "Pro" || currentPlan === "Lite") && planName === "Free") return false;
+
+        return true;
     };
 
     const handlePaymentModalClose = () => {
@@ -177,9 +224,16 @@ export default function Pricing() {
                                         <plan.icon className="w-8 h-8 text-background" />
                                     </div>
 
-                                    <h3 className="text-2xl font-bold mb-2 text-foreground">
-                                        {plan.name}
-                                    </h3>
+                                    <div className="flex items-center justify-center gap-2 mb-2">
+                                        <h3 className="text-2xl font-bold text-foreground">
+                                            {plan.name}
+                                        </h3>
+                                        {isPlanActive(plan.name) && (
+                                            <span className="px-2 py-1 text-xs font-semibold bg-primary text-primary-foreground rounded-full">
+                                                Active
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-muted-foreground mb-4">
                                         {plan.description}
                                     </p>
@@ -232,19 +286,22 @@ export default function Pricing() {
                                     }
                                     className="w-[90%] font-semibold cursor-pointer absolute left-1/2 -translate-x-1/2 bottom-4 rounded-lg mb-2"
                                     onClick={() => handlePlanClick(plan.name)}
-                                    disabled={Boolean(
-                                        plan.name === "Free" &&
-                                        usageData !== null &&
-                                        usageData.plan === "Free" &&
-                                        usageData.canUpload === false
-                                    )}
+                                    disabled={
+                                        (plan.name === "Free" &&
+                                            usageData !== null &&
+                                            usageData.plan === "Free" &&
+                                            usageData.canUpload === false) ||
+                                        !canUpgradeToPlan(plan.name)
+                                    }
                                 >
-                                    {plan.name === "Free" &&
-                                        usageData !== null &&
-                                        usageData.plan === "Free" &&
-                                        usageData.canUpload === false
-                                        ? "Limit Reached"
-                                        : plan.cta}
+                                    {isPlanActive(plan.name)
+                                        ? "Current Plan"
+                                        : plan.name === "Free" &&
+                                            usageData !== null &&
+                                            usageData.plan === "Free" &&
+                                            usageData.canUpload === false
+                                            ? "Limit Reached"
+                                            : plan.cta}
                                 </Button>
                             </div>
                         </motion.div>

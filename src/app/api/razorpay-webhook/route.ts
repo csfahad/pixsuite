@@ -75,13 +75,18 @@ export async function POST(request: NextRequest) {
                 // set usage limit based on plan
                 const usageLimit = planType === "Lite" ? 1000 : 10000;
 
-                // update user plan to Paid
+                // calculate expiration date (1 month from now)
+                const subscriptionExpiresAt = new Date();
+                subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1);
+
+                // update user plan and set expiration
                 await prisma.users.update({
                     where: { id: user.id },
                     data: {
-                        plan: "Paid",
+                        plan: planType === "Lite" ? "Lite" : "Pro",
                         usageLimit: usageLimit,
                         razorpayCustomerId: paymentId,
+                        subscriptionExpiresAt: subscriptionExpiresAt,
                     },
                 });
 
@@ -94,8 +99,10 @@ export async function POST(request: NextRequest) {
                     await prisma.subscriptions.update({
                         where: { id: existingSubscription.id },
                         data: {
+                            plan: planType === "Lite" ? "Lite" : "Pro",
                             razorpaySubscriptionId: orderId,
                             razorpayCustomerId: paymentId,
+                            expiresAt: subscriptionExpiresAt,
                             updatedAt: new Date(),
                         },
                     });
@@ -103,8 +110,10 @@ export async function POST(request: NextRequest) {
                     await prisma.subscriptions.create({
                         data: {
                             userId: user.id,
+                            plan: planType === "Lite" ? "Lite" : "Pro",
                             razorpaySubscriptionId: orderId,
                             razorpayCustomerId: paymentId,
+                            expiresAt: subscriptionExpiresAt,
                         },
                     });
                 }

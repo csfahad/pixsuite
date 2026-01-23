@@ -15,28 +15,32 @@ enum Role {
 
 enum Plan {
     Free
-    Paid
+    Lite
+    Pro
 }
 
 model users {
-    id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-    name               String
-    email              String   @unique
-    avatar             String?
-    razorpayCustomerId String?
-    plan               Plan     @default(Free)
-    role               Role     @default(User)
-    usageCount         Int      @default(0)
-    usageLimit         Int      @default(3)
-    createdAt          DateTime @default(now())
-    updatedAt          DateTime @updatedAt
+    id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+    name                  String
+    email                 String    @unique
+    avatar                String?
+    razorpayCustomerId    String?
+    plan                  Plan      @default(Free)
+    role                  Role      @default(User)
+    usageCount            Int       @default(0)
+    usageLimit            Int       @default(3)
+    subscriptionExpiresAt DateTime?
+    createdAt             DateTime  @default(now())
+    updatedAt             DateTime  @updatedAt
 }
 
 model subscriptions {
     id                     String   @id @default(auto()) @map("_id") @db.ObjectId
     userId                 String   @db.ObjectId
+    plan                   Plan
     razorpaySubscriptionId String
     razorpayCustomerId     String
+    expiresAt              DateTime
     createdAt              DateTime @default(now())
     updatedAt              DateTime @updatedAt
 }

@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
                 plan: true,
                 usageCount: true,
                 usageLimit: true,
+                subscriptionExpiresAt: true,
             },
         });
 
@@ -30,11 +31,36 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // check if subscription has expired
+        const isSubscriptionActive = user.subscriptionExpiresAt 
+            ? new Date(user.subscriptionExpiresAt) > new Date()
+            : false;
+
+        // if subscription expired, reset to Free plan
+        if ((user.plan === "Lite" || user.plan === "Pro") && !isSubscriptionActive) {
+            await prisma.users.update({
+                where: { id: user.id },
+                data: {
+                    plan: "Free",
+                    usageLimit: 3,
+                    subscriptionExpiresAt: null,
+                },
+            });
+            return NextResponse.json({
+                usageCount: user.usageCount,
+                usageLimit: 3,
+                plan: "Free",
+                canUpload: user.usageCount < 3,
+                subscriptionExpiresAt: null,
+            });
+        }
+
         return NextResponse.json({
             usageCount: user.usageCount,
             usageLimit: user.usageLimit,
             plan: user.plan,
             canUpload: user.usageCount < user.usageLimit,
+            subscriptionExpiresAt: user.subscriptionExpiresAt?.toISOString() || null,
         });
     } catch (err) {
         console.error("Usage check error:", err);

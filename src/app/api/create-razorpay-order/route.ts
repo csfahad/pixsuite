@@ -21,11 +21,6 @@ export async function POST(request: NextRequest) {
 
         const user = await prisma.users.findUnique({
             where: { email: token.email as string },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-            },
         });
 
         if (!user) {
@@ -37,8 +32,34 @@ export async function POST(request: NextRequest) {
 
         // get plan from request body
         const body = await request.json().catch(() => ({}));
-        
         const planType = body.plan || "Lite";
+        
+        // check if user already has an active subscription for this plan
+        const isSubscriptionActive = user.subscriptionExpiresAt 
+            ? new Date(user.subscriptionExpiresAt) > new Date()
+            : false;
+
+        if (user.plan === planType && isSubscriptionActive) {
+            return NextResponse.json(
+                { error: `You already have an active ${planType} Plan subscription` },
+                { status: 400 }
+            );
+        }
+
+        // prevent downgrades
+        if (user.plan === "Pro" && planType === "Lite") {
+            return NextResponse.json(
+                { error: "Pro users cannot downgrade to Lite plan" },
+                { status: 400 }
+            );
+        }
+        if ((user.plan === "Pro" || user.plan === "Lite") && planType === "Free") {
+            return NextResponse.json(
+                { error: "Paid users cannot downgrade to Free plan" },
+                { status: 400 }
+            );
+        }
+
         const amount = planType === "Lite" ? 99900 : 290000;
 
         const receipt = `rcpt_${user.id.slice(-10)}_${Date.now().toString().slice(-8)}`;

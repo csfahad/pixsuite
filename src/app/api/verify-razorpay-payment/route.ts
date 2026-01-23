@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
         if (!token?.email) {
             return NextResponse.json(
                 { error: "Unauthorized" },
-                { status: 401 }
+                { status: 401 },
             );
         }
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
             return NextResponse.json(
                 { error: "Missing payment details" },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         if (generated_signature !== razorpay_signature) {
             return NextResponse.json(
                 { error: "Invalid payment signature" },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
@@ -52,24 +52,29 @@ export async function POST(request: NextRequest) {
         if (!user) {
             return NextResponse.json(
                 { error: "User not found" },
-                { status: 404 }
+                { status: 404 },
             );
         }
 
         // get plan from order notes
         const order = await razorpay.orders.fetch(razorpay_order_id);
-        const planType = order.notes?.plan || "Pro";
+        const planType = order.notes?.plan || "Lite";
 
         // set usage limit based on plan
         const usageLimit = planType === "Lite" ? 1000 : 10000;
 
-        // update user plan to Paid
+        // calculate expiration date (1 month from now)
+        const subscriptionExpiresAt = new Date();
+        subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1);
+
+        // update user plan and set expiration
         await prisma.users.update({
             where: { id: user.id },
             data: {
-                plan: "Paid",
+                plan: planType === "Lite" ? "Lite" : "Pro",
                 usageLimit: usageLimit,
                 razorpayCustomerId: razorpay_payment_id,
+                subscriptionExpiresAt: subscriptionExpiresAt,
             },
         });
 
@@ -82,8 +87,10 @@ export async function POST(request: NextRequest) {
             await prisma.subscriptions.update({
                 where: { id: existingSubscription.id },
                 data: {
+                    plan: planType === "Lite" ? "Lite" : "Pro",
                     razorpaySubscriptionId: razorpay_order_id,
                     razorpayCustomerId: razorpay_payment_id,
+                    expiresAt: subscriptionExpiresAt,
                     updatedAt: new Date(),
                 },
             });
@@ -91,8 +98,10 @@ export async function POST(request: NextRequest) {
             await prisma.subscriptions.create({
                 data: {
                     userId: user.id,
+                    plan: planType === "Lite" ? "Lite" : "Pro",
                     razorpaySubscriptionId: razorpay_order_id,
                     razorpayCustomerId: razorpay_payment_id,
+                    expiresAt: subscriptionExpiresAt,
                 },
             });
         }
@@ -105,7 +114,7 @@ export async function POST(request: NextRequest) {
         console.error("Payment verification error:", err);
         return NextResponse.json(
             { error: "Failed to verify payment", details: err.message },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }
