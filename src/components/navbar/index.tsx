@@ -4,6 +4,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Menu, WandSparkles, X } from "lucide-react";
+import Link from "next/link";
 import { Button } from "../ui/button";
 
 export default function Navbar() {
@@ -39,11 +40,10 @@ export default function Navbar() {
         <motion.nav
             initial={{ y: -100 }}
             animate={{ y: 0 }}
-            className={`fixed top-0 md:top-1 left-0 right-0 z-50 ${
-                isScrolled
-                    ? "fixed top-0 md:top-2 left-1/2 z-50 -translate-x-1/2 rounded-none md:rounded-lg w-full max-w-6xl glass border border-card! backdrop-blur-glass"
-                    : "bg-transparent"
-            }`}
+            className={`fixed top-0 md:top-1 left-0 right-0 z-50 ${isScrolled
+                ? "fixed top-0 md:top-2 left-1/2 z-50 -translate-x-1/2 rounded-none md:rounded-lg w-full max-w-6xl glass border border-card! backdrop-blur-glass"
+                : "bg-transparent"
+                }`}
         >
             <div className="container mx-auto max-w-6xl px-4 py-4">
                 <div className="flex items-center justify-between min-w-0">
@@ -60,9 +60,9 @@ export default function Navbar() {
                             />
                             <div className="absolute inset-0 h-8 w-8 text-secondary animate-glow-pulse opacity-50" />
                         </div>
-                        <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-primary">
+                        <Link href="/" className="text-2xl font-bold bg-gradient-primary bg-clip-text text-primary">
                             PixSuite
-                        </span>
+                        </Link>
                     </motion.div>
 
                     {/* Navigation */}
