@@ -119,16 +119,8 @@ export default function PaymentModal({
                             throw new Error("Payment verification failed");
                         }
                     } catch (err) {
-                        console.error("Payment verification error:", err);
-                        // alert(
-                        //     "Payment verification failed. Please contact support.",
-                        // );
-
                         window.location.href = "/?payment_failed=true";
-                        // toast.error("Payment verification failed", {
-                        //     description: "Please contact support.",
-                        // });
-
+                        console.error("Payment verification error:", err);
                     } finally {
                         setIsLoading(false);
                     }
@@ -139,9 +131,7 @@ export default function PaymentModal({
                 modal: {
                     ondismiss: function () {
                         setIsLoading(false);
-
                         window.location.href = "/?payment_cancelled=true";
-
                     },
                 },
             };
