@@ -114,20 +114,21 @@ export default function PaymentModal({
                         const result = await verifyResponse.json();
 
                         if (result.success) {
-                            // call onUpgrade callback to refresh user data
-                            onUpgrade();
-                            onClose();
-                            alert(
-                                `Payment successful! Your ${plan} plan is now active.`,
-                            );
+                            window.location.href = `/?upgraded=${plan}`;
                         } else {
                             throw new Error("Payment verification failed");
                         }
                     } catch (err) {
                         console.error("Payment verification error:", err);
-                        alert(
-                            "Payment verification failed. Please contact support.",
-                        );
+                        // alert(
+                        //     "Payment verification failed. Please contact support.",
+                        // );
+
+                        window.location.href = "/?payment_failed=true";
+                        // toast.error("Payment verification failed", {
+                        //     description: "Please contact support.",
+                        // });
+
                     } finally {
                         setIsLoading(false);
                     }
@@ -138,6 +139,9 @@ export default function PaymentModal({
                 modal: {
                     ondismiss: function () {
                         setIsLoading(false);
+
+                        window.location.href = "/?payment_cancelled=true";
+
                     },
                 },
             };
