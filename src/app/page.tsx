@@ -119,7 +119,6 @@ export default function Home() {
             <Hero />
             <Features />
             <Pricing />
-            <Editor />
             <Footer />
         </div >
     );
