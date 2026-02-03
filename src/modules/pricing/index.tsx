@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Crown, Star, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ const plans = [
 ];
 
 export default function Pricing() {
+    const router = useRouter();
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<"Lite" | "Pro">("Lite");
     const [usageData, setUsageData] = useState<{
@@ -87,16 +89,13 @@ export default function Pricing() {
         }
     };
 
-    const scrollToEditor = () => {
-        const element = document.getElementById("editor");
-        if (element) {
-            element.scrollIntoView({ behavior: "smooth" });
-        }
+    const navigateToEditor = () => {
+        router.push("/editor");
     };
 
     const handlePlanClick = (planName: string) => {
         if (planName === "Free") {
-            scrollToEditor();
+            navigateToEditor();
             return;
         }
 
@@ -201,9 +200,8 @@ export default function Pricing() {
                             viewport={{ once: true }}
                             transition={{ duration: 0.8, delay: index * 0.2 }}
                             whileHover={{ scale: 1.02, y: -5 }}
-                            className={`relative group ${
-                                plan.popular ? "lg:-mt-8" : ""
-                            }`}
+                            className={`relative group ${plan.popular ? "lg:-mt-8" : ""
+                                }`}
                         >
                             {plan.popular && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
@@ -222,11 +220,10 @@ export default function Pricing() {
                             )}
 
                             <div
-                                className={`h-full glass rounded-xl p-8 border transition-all duration-300 ${
-                                    plan.popular
-                                        ? "border-primary/50 shadow-glow-primary"
-                                        : "hover:border-primary/30 shadow-glow-subtle hover:shadow-glow-primary"
-                                }`}
+                                className={`h-full glass rounded-xl p-8 border transition-all duration-300 ${plan.popular
+                                    ? "border-primary/50 shadow-glow-primary"
+                                    : "hover:border-primary/30 shadow-glow-subtle hover:shadow-glow-primary"
+                                    }`}
                             >
                                 <div className="text-center mb-8">
                                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-linear-to-br from-secondary to-secondary group-hover:animate-glow-pulse">
@@ -309,8 +306,8 @@ export default function Pricing() {
                                             usageData !== null &&
                                             usageData.plan === "Free" &&
                                             usageData.canUpload === false
-                                          ? "Limit Reached"
-                                          : plan.cta}
+                                            ? "Limit Reached"
+                                            : plan.cta}
                                 </Button>
                             </div>
                         </motion.div>
