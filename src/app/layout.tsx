@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Poppins } from "next/font/google";
+import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css";
 import Provider from "./providers";
 import Navbar from "@/components/navbar";
@@ -40,10 +41,17 @@ export default function RootLayout({
             <body
                 className={`${poppins.variable} ${geistMono.variable} antialiased`}
             >
-                <Provider>
-                    <Navbar />
-                    {children}
-                </Provider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    <Provider>
+                        <Navbar />
+                        {children}
+                    </Provider>
+                </ThemeProvider>
             </body>
         </html>
     );
