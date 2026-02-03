@@ -1,10 +1,43 @@
 "use client";
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Play, ArrowRight, WandSparkles } from "lucide-react";
 import BeforeAfterSlider from "./BeforeAfterSlider";
+import Link from "next/link";
+
+interface UsageData {
+    usageCount: number;
+    usageLimit: number;
+    plan: string;
+    canUpload: boolean;
+    subscriptionExpiresAt?: string | null;
+}
 
 export default function Hero() {
+    const [usageData, setUsageData] = useState<UsageData | null>(null);
+
+    useEffect(() => {
+        const checkUsage = async () => {
+            try {
+                const response = await fetch("/api/usage");
+                if (response.ok) {
+                    const data = await response.json();
+                    setUsageData(data);
+                }
+            } catch (err) {
+                console.error("Failed to check usage:", err);
+            }
+        };
+        checkUsage();
+    }, []);
+
+    const currentPlan = usageData?.plan || "Free";
+    const isFreePlan = currentPlan === "Free";
+    const isLitePlan = currentPlan === "Lite";
+    const isProPlan = currentPlan === "Pro";
+    const isFreeAndLimitReached = isFreePlan && usageData && !usageData.canUpload;
+
     const scrollToSection = (sectionId: string) => {
         const element = document.getElementById(sectionId);
         if (element) {
@@ -65,7 +98,7 @@ export default function Hero() {
                             transition={{ delay: 0.3 }}
                             className="text-3xl lg:text-6xl font-bold leading-tight mb-3"
                         >
-                            <span className="text-foreground">
+                            <span className="text-muted-foreground">
                                 Instantly edit images{" "}
                                 <span className="flex items-center justify-center">
                                     —`just upload & go!`
@@ -92,39 +125,97 @@ export default function Hero() {
                             transition={{ delay: 0.5 }}
                             className="flex flex-col sm:flex-row gap-4 justify-center"
                         >
-                            <Button
-                                variant="default"
-                                size="lg"
-                                onClick={() => scrollToSection("editor")}
-                                className="group text-white"
-                            >
-                                <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
-                                Try Free Now
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                size="lg"
-                                onClick={() => scrollToSection("editor")}
-                                className="group"
-                            >
-                                Launch App
-                                <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                            </Button>
+                            {isFreePlan && (
+                                <>
+                                    {isFreeAndLimitReached ? (
+                                        <Button
+                                            variant="secondary"
+                                            size="lg"
+                                            disabled
+                                            className="group text-accent-foreground cursor-not-allowed opacity-60"
+                                        >
+                                            <Play className="h-5 w-5 mr-2" />
+                                            Free Limit Reached
+                                        </Button>
+                                    ) : (
+                                        <Link href="/editor">
+                                            <Button
+                                                variant="secondary"
+                                                size="lg"
+                                                className="group text-accent-foreground cursor-pointer w-full"
+                                            >
+                                                <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
+                                                Try Free Now
+                                            </Button>
+                                        </Link>
+                                    )}
+                                    <Button
+                                        variant="default"
+                                        size="lg"
+                                        onClick={() => scrollToSection("pricing")}
+                                        className="group cursor-pointer"
+                                    >
+                                        Start Plan
+                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                    </Button>
+                                </>
+                            )}
+
+                            {isLitePlan && (
+                                <>
+                                    <Button
+                                        variant="secondary"
+                                        size="lg"
+                                        onClick={() => scrollToSection("pricing")}
+                                        className="group cursor-pointer"
+                                    >
+                                        Switch to Pro
+                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                    </Button>
+                                    <Link href="/editor">
+                                        <Button
+                                            variant="default"
+                                            size="lg"
+                                            className="group text-white cursor-pointer w-full"
+                                        >
+                                            <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
+                                            Start Editing
+                                        </Button>
+                                    </Link>
+                                </>
+                            )}
+
+                            {isProPlan && (
+                                <Link href="/editor">
+                                    <Button
+                                        variant="default"
+                                        size="lg"
+                                        className="group text-white cursor-pointer w-full"
+                                    >
+                                        Start Editing
+                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                    </Button>
+                                </Link>
+                            )}
                         </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.6 }}
-                            className="mt-8 flex items-center justify-center space-x-6 text-sm text-muted-foreground"
+                            className="mt-8 grid grid-cols-1 md:grid-cols-3 items-start justify-items-center-safe gap-2 md:gap-0 md:space-x-6 text-sm text-muted-foreground"
                         >
                             <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                                <span>Unlimited uploads on Pro</span>
+                                <div className="w-2 h-2 bg-chart-1 rounded-full animate-pulse" />
+                                <span>Perfect to explore on Free</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-secondary rounded-full animate-pulse" />
-                                <span>Unlimited edits</span>
+                                <div className="w-2 h-2 bg-chart-2 rounded-full animate-pulse" />
+                                <span>Generous limits on Lite</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                <span>Infinite possibilities on Pro</span>
                             </div>
                         </motion.div>
                     </motion.div>
