@@ -261,7 +261,7 @@ export default function Navbar() {
                                 </div>
                             </div>
                         </motion.div>
-                        <div className="hidden lg:flex w-full gap-2 space-y-3 md:w-fit">
+                        <div className="hidden lg:flex w-full gap-2 md:w-fit items-center justify-center">
                             <ModeToggle />
                             <Button
                                 variant="outline"
