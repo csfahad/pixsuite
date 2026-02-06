@@ -205,7 +205,7 @@ export default function Pricing() {
                         >
                             {plan.popular && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                                    <div className="bg-primary px-6 py-2 rounded-lg text-sm font-bold text-background">
+                                    <div className="bg-primary/80 px-6 py-2 rounded-lg text-sm font-bold text-background">
                                         Most Popular
                                     </div>
                                 </div>
@@ -213,20 +213,20 @@ export default function Pricing() {
 
                             {plan.proPopular && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                                    <div className="bg-primary px-6 py-2 rounded-lg text-sm font-bold text-background">
+                                    <div className="bg-primary/80 px-6 py-2 rounded-lg text-sm font-bold text-background">
                                         Popular
                                     </div>
                                 </div>
                             )}
 
                             <div
-                                className={`h-full glass rounded-xl p-8 border transition-all duration-300 ${plan.popular
+                                className={`h-full glass rounded-xl p-8 border dark:border-muted-foreground/30 transition-all duration-300 ${plan.popular
                                     ? "border-primary/50 shadow-glow-primary"
                                     : "hover:border-primary/30 shadow-glow-subtle hover:shadow-glow-primary"
                                     }`}
                             >
                                 <div className="text-center mb-8">
-                                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-linear-to-br from-secondary to-secondary group-hover:animate-glow-pulse">
+                                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-primary group-hover:animate-glow-pulse">
                                         <plan.icon className="w-8 h-8 text-background" />
                                     </div>
 
