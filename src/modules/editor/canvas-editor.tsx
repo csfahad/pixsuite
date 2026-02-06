@@ -26,7 +26,7 @@ export default function CanvasEditor({
 
     if (!originalImage) {
         return (
-            <div className="shadow-glass rounded-lg border border-primary/50 aspect-4/3 flex items-center justify-center">
+            <div className="shadow-glass rounded-lg border border-primary/20 aspect-4/3 flex items-center justify-center">
                 <div className="text-center">
                     <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-xl flex items-center justify-center">
                         <span className="text-2xl">🎨</span>
@@ -83,9 +83,8 @@ export default function CanvasEditor({
                         <div
                             className="absolute inset-0 overflow-hidden"
                             style={{
-                                clipPath: `inset(0 ${
-                                    100 - sliderPosition
-                                }% 0 0)`,
+                                clipPath: `inset(0 ${100 - sliderPosition
+                                    }% 0 0)`,
                             }}
                         >
                             <img

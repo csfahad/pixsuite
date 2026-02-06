@@ -551,7 +551,7 @@ export default function Editor() {
                             viewport={{ once: true }}
                             className="lg:col-span-1"
                         >
-                            <div className="shadow-glass rounded-lg p-6 border border-primary/80">
+                            <div className="shadow-glass rounded-lg p-6 border border-primary/20">
                                 <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center justify-center">
                                     Job Status
                                 </h3>
@@ -660,7 +660,7 @@ export default function Editor() {
                                         <Button
                                             variant="default"
                                             onClick={() => handleExport("jpg")}
-                                            className="w-full"
+                                            className="w-full cursor-pointer"
                                         >
                                             <Download className="h-4 w-4 mr-2" />
                                             Download
