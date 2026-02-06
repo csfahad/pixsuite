@@ -161,7 +161,7 @@ export default function PaymentModal({
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.95, opacity: 0 }}
-                        className="relative w-full max-w-md glass rounded-xl p-6 border border-card! shadow-glow-primary mt-12"
+                        className="relative w-full max-w-md glass rounded-xl p-6 border border-primary/20 dark:border-primary/20 shadow-glow-primary mt-12"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Close Button */}
@@ -323,7 +323,7 @@ export default function PaymentModal({
                             <Button
                                 variant="outline"
                                 onClick={onClose}
-                                className="w-full border-card-border"
+                                className="w-full border-card-border cursor-pointer"
                             >
                                 Maybe Later
                             </Button>
@@ -334,7 +334,7 @@ export default function PaymentModal({
                             By upgrading, you agree to our{" "}
                             <a
                                 href="/terms"
-                                className="text-primary underline hover:text-primary/80"
+                                className="text-primary/90 underline hover:text-muted-foreground"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
@@ -344,7 +344,7 @@ export default function PaymentModal({
                                 and&nbsp;
                                 <a
                                     href="/privacy"
-                                    className="text-muted-foreground underline hover:text-primary"
+                                    className="text-primary/90 underline hover:text-muted-foreground"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
