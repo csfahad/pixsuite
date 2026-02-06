@@ -3,7 +3,7 @@
 // import { signIn, useSession } from "next-auth/react";
 // import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Menu, WandSparkles, X } from "lucide-react";
+import { CircleUserRound, Menu, WandSparkles, X } from "lucide-react";
 // import Link from "next/link";
 // import { Button } from "../ui/button";
 
@@ -145,6 +145,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useRouter } from "next/navigation";
 import ModeToggle from "@/components/modeToggle/index";
+import UserInfo from "./user-info";
 
 export default function Navbar() {
     const [menuState, setMenuState] = useState(false)
@@ -185,7 +186,7 @@ export default function Navbar() {
                 data-state={menuState && 'active'}
                 className={cn('fixed z-20 w-full transition-colors duration-150', scrolled && 'border-b bg-background/50 backdrop-blur-3xl')}>
                 <div className="mx-auto max-w-6xl px-6 transition-all duration-300">
-                    <div className="relative flex flex-wrap items-center justify-between gap-6 py-3 lg:gap-0 lg:py-4">
+                    <div className="relative flex flex-wrap items-center justify-between gap-6 py-3 lg:py-4">
                         <motion.div
                             whileHover={{ scale: 1.05 }}
                             onClick={() => scrollToSection("hero")}
@@ -215,7 +216,7 @@ export default function Navbar() {
                             </button>
                         </motion.div>
 
-                        <div className="hidden lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:block space-x-8 text-normal mt-1">
+                        {/* <div className="hidden lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:block space-x-8 text-normal mt-1">
                             <button
                                 onClick={() => scrollToSection("features")}
                                 className="text-muted-foreground hover:text-accent-foreground transition-colors cursor-pointer duration-150"
@@ -228,7 +229,7 @@ export default function Navbar() {
                             >
                                 Pricing
                             </button>
-                        </div>
+                        </div> */}
 
                         <motion.div
                             initial={false}
@@ -237,13 +238,16 @@ export default function Navbar() {
                                 opacity: menuState ? 1 : 0,
                             }}
                             className="bg-background in-data-[state=active]:block lg:in-data-[state=active]:flex mb-6 hidden w-full flex-wrap items-center justify-end space-y-8 rounded-lg border p-6 shadow-2xl shadow-zinc-300/20 md:flex-nowrap lg:m-0 lg:flex lg:w-fit lg:gap-6 lg:space-y-0 lg:border-transparent lg:bg-transparent lg:p-0 lg:shadow-none dark:shadow-none dark:lg:bg-transparent">
-                            <div className="lg:hidden py-4 space-y-4">
-                                <button
-                                    onClick={() => scrollToSection("features")}
-                                    className="block w-full text-left text-foreground hover:text-primary transition-colors font-medium"
-                                >
-                                    Features
-                                </button>
+                            <div className="lg:hidden py-2 space-y-4">
+                                <div className="flex items-center">
+                                    <button
+                                        onClick={() => scrollToSection("features")}
+                                        className="block w-full text-left text-foreground hover:text-primary transition-colors font-medium"
+                                    >
+                                        Features
+                                    </button>
+                                    <ModeToggle />
+                                </div>
                                 <button
                                     onClick={() => scrollToSection("pricing")}
                                     className="block w-full text-left text-foreground hover:text-primary transition-colors font-medium"
@@ -261,15 +265,34 @@ export default function Navbar() {
                                 </div>
                             </div>
                         </motion.div>
-                        <div className="hidden lg:flex w-full gap-2 md:w-fit items-center justify-center">
-                            <ModeToggle />
-                            <Button
-                                variant="outline"
-                                className="w-full cursor-pointer"
-                                onClick={handleSubmit}
-                            >
-                                {session?.user ? "Launch App" : "Sign In"}
-                            </Button>
+
+                        <div className="hidden lg:flex items-center gap-3">
+                            <div className="flex items-center gap-6">
+                                <button
+                                    onClick={() => scrollToSection("features")}
+                                    className="text-muted-foreground hover:text-accent-foreground transition-colors cursor-pointer duration-150 whitespace-nowrap"
+                                >
+                                    Features
+                                </button>
+                                <button
+                                    onClick={() => scrollToSection("pricing")}
+                                    className="text-muted-foreground hover:text-accent-foreground transition-colors cursor-pointer duration-150 whitespace-nowrap"
+                                >
+                                    Pricing
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <ModeToggle />
+                                {session?.user ? <UserInfo /> :
+                                    <Button
+                                        variant="default"
+                                        className="cursor-pointer px-4 shrink-0"
+                                        onClick={handleSubmit}
+                                    >
+                                        Sign In
+                                    </Button>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
