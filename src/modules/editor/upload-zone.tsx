@@ -256,8 +256,12 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
 
                         <Button
                             variant="outline"
-                            className="glass border-card-border"
+                            className="glass border-card-border cursor-pointer"
                             disabled={isUploading}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                document.getElementById("file-upload")?.click();
+                            }}
                         >
                             {isUploading ? (
                                 <>
