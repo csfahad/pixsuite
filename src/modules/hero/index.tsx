@@ -73,7 +73,7 @@ export default function Hero() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 }}
-                            className="inline-flex items-center justify-center space-x-2 rounded-lg px-4 py-2 mb-6 glass border border-card-border"
+                            className="inline-flex items-center justify-center space-x-2 rounded-lg px-4 py-2 mb-6 glass border dark:border-muted-foreground/30"
                         >
                             <WandSparkles className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">
@@ -176,7 +176,7 @@ export default function Hero() {
                                         <Button
                                             variant="default"
                                             size="lg"
-                                            className="group text-white cursor-pointer w-full"
+                                            className="group text-background cursor-pointer w-full"
                                         >
                                             <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
                                             Start Editing
@@ -190,7 +190,7 @@ export default function Hero() {
                                     <Button
                                         variant="default"
                                         size="lg"
-                                        className="group text-white cursor-pointer w-full"
+                                        className="group text-background cursor-pointer w-full"
                                     >
                                         Start Editing
                                         <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
