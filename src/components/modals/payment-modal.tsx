@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, Crown, Star, X, Zap } from "lucide-react";
+import { Check, Crown, LogIn, Star, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 declare global {
@@ -17,6 +18,7 @@ interface PaymentModalProps {
     usageCount: number;
     usageLimit: number;
     plan?: "Lite" | "Pro";
+    isAuthenticated?: boolean;
 }
 
 export default function PaymentModal({
@@ -26,6 +28,7 @@ export default function PaymentModal({
     usageCount,
     usageLimit,
     plan = "Lite",
+    isAuthenticated = true,
 }: PaymentModalProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
@@ -126,7 +129,7 @@ export default function PaymentModal({
                     }
                 },
                 theme: {
-                    color: "#D04F99",
+                    color: "oklch(0 0 0)",
                 },
                 modal: {
                     ondismiss: function () {
@@ -137,6 +140,7 @@ export default function PaymentModal({
             };
 
             const razorpay = new window.Razorpay(options);
+            onClose();
             razorpay.open();
         } catch (err: any) {
             console.error("Upgrade failed:", err);
@@ -298,27 +302,37 @@ export default function PaymentModal({
 
                         {/* Action Buttons */}
                         <div className="space-y-3">
-                            <Button
-                                onClick={handleUpgrade}
-                                disabled={isLoading}
-                                className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary transition-all cursor-pointer"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        {plan === "Pro" ? (
-                                            <Crown className="h-4 w-4 mr-2" />
-                                        ) : (
-                                            <Zap className="h-4 w-4 mr-2" />
-                                        )}
-                                        Start {plan} Plan
-                                    </>
-                                )}
-                            </Button>
+                            {isAuthenticated ? (
+                                <Button
+                                    onClick={handleUpgrade}
+                                    disabled={isLoading}
+                                    className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary transition-all cursor-pointer"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            {plan === "Pro" ? (
+                                                <Crown className="h-4 w-4 mr-2" />
+                                            ) : (
+                                                <Zap className="h-4 w-4 mr-2" />
+                                            )}
+                                            Start {plan} Plan
+                                        </>
+                                    )}
+                                </Button>
+                            ) : (
+                                <Button
+                                    onClick={() => signIn("google", { callbackUrl: `/editor?showUpgrade=${plan}` })}
+                                    className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary transition-all cursor-pointer"
+                                >
+                                    <LogIn className="h-4 w-4 mr-2" />
+                                    Sign in to Upgrade
+                                </Button>
+                            )}
 
                             <Button
                                 variant="outline"
