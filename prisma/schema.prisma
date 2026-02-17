@@ -44,3 +44,12 @@ model subscriptions {
     createdAt              DateTime @default(now())
     updatedAt              DateTime @updatedAt
 }
+
+model anonymous_sessions {
+    id         String   @id @default(auto()) @map("_id") @db.ObjectId
+    sessionId  String   @unique
+    usageCount Int      @default(0)
+    usageLimit Int      @default(3)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+}
