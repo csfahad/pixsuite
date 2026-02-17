@@ -11,7 +11,7 @@ import {
     Type,
     Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { motion } from "motion/react";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
@@ -368,7 +368,9 @@ export default function Editor() {
                             viewport={{ once: true }}
                             className="lg:col-span-1"
                         >
-                            <UploadZone onImageUpload={handleImageUpload} />
+                            <Suspense fallback={null}>
+                                <UploadZone onImageUpload={handleImageUpload} />
+                            </Suspense>
 
                             {/* Toolbar */}
                             <div className="mt-6 space-y-3">
