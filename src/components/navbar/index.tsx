@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { signIn, useSession } from "next-auth/react";
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import ModeToggle from "@/components/modeToggle/index";
 import UserInfo from "./user-info";
 
@@ -20,6 +20,7 @@ export default function Navbar() {
     const { data: session } = useSession();
 
     const router = useRouter();
+    const pathname = usePathname();
 
     useEffect(() => {
         const unsubscribe = scrollYProgress.on('change', (latest) => {
@@ -29,6 +30,10 @@ export default function Navbar() {
     }, [scrollYProgress])
 
     const scrollToSection = (sectionId: string) => {
+        if (pathname !== "/") {
+            router.push(`/#${sectionId}`);
+            return;
+        }
         const element = document.getElementById(sectionId);
         if (element) {
             element.scrollIntoView({ behavior: "smooth" });
