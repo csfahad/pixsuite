@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { signIn, useSession } from "next-auth/react";
 import { Check, Crown, Star, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,8 @@ const plans = [
 
 export default function Pricing() {
     const router = useRouter();
+    const { data: session } = useSession();
+    const isAuthenticated = !!session?.user;
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<"Lite" | "Pro">("Lite");
     const [usageData, setUsageData] = useState<{
@@ -79,6 +82,9 @@ export default function Pricing() {
     const checkUsage = async () => {
         try {
             const response = await fetch("/api/usage");
+            if (response.status === 401) {
+                return null;
+            }
             if (response.ok) {
                 const data = await response.json();
                 setUsageData(data);
@@ -96,6 +102,11 @@ export default function Pricing() {
     const handlePlanClick = (planName: string) => {
         if (planName === "Free") {
             navigateToEditor();
+            return;
+        }
+
+        if (!isAuthenticated) {
+            signIn("google", { callbackUrl: `/editor?showUpgrade=${planName}` });
             return;
         }
 
@@ -339,6 +350,7 @@ export default function Pricing() {
                 usageCount={usageData?.usageCount || 0}
                 usageLimit={usageData?.usageLimit || 3}
                 plan={selectedPlan}
+                isAuthenticated={isAuthenticated}
             />
         </section>
     );
