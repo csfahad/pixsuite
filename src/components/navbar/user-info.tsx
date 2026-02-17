@@ -5,6 +5,7 @@ import {
     BadgeCheckIcon,
     BellIcon,
     CreditCardIcon,
+    ImagePlus,
     LogOutIcon,
 } from "lucide-react"
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export default function UserInfo() {
     const { data: session } = useSession()
@@ -50,6 +52,13 @@ export default function UserInfo() {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+                <Link href="/editor">
+                    <DropdownMenuItem>
+                        <ImagePlus />
+                        Launch Editor
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                </Link>
                 <DropdownMenuGroup>
                     <DropdownMenuItem>
                         <BadgeCheckIcon />
