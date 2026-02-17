@@ -2,8 +2,6 @@
 
 import { motion } from "motion/react";
 import { Menu, WandSparkles, X } from "lucide-react";
-
-
 import { useEffect, useState } from "react";
 import { useScroll } from 'motion/react'
 import { cn } from '@/lib/utils'
