@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { motion } from "motion/react";
 import { Crown, ImageIcon, Loader2, Upload, X } from "lucide-react";
 import {
@@ -15,6 +17,13 @@ interface UploadZoneProps {
 }
 
 export default function UploadZone({ onImageUpload }: UploadZoneProps) {
+    const { data: session } = useSession();
+    const isAuthenticated = !!session?.user;
+    const hasTransferred = useRef(false);
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const [selectedPlan, setSelectedPlan] = useState<"Lite" | "Pro">("Lite");
+
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -26,10 +35,41 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
         canUpload: boolean;
     } | null>(null);
 
-    // check the usage on component mount
     useEffect(() => {
-        checkUsage()?.catch(console.error);
-    }, []);
+        if (isAuthenticated) {
+            if (!hasTransferred.current) {
+                hasTransferred.current = true;
+                fetch("/api/transfer-usage", { method: "POST" })
+                    .then(() => checkUsage())
+                    .catch(console.error);
+            } else {
+                checkUsage()?.catch(console.error);
+            }
+        } else {
+            checkFreeUsage().catch(console.error);
+        }
+    }, [isAuthenticated]);
+
+    // auto-open payment modal after OAuth redirect
+    useEffect(() => {
+        const upgradePlan = searchParams.get("showUpgrade");
+        if (upgradePlan && isAuthenticated) {
+            router.replace("/editor", { scroll: false });
+
+            // check if user already has an active paid plan
+            fetch("/api/usage")
+                .then((res) => res.json())
+                .then((data) => {
+                    setUsageData(data);
+                    const currentPlan = data?.plan || "Free";
+                    if (currentPlan === "Free") {
+                        setSelectedPlan(upgradePlan as "Lite" | "Pro");
+                        setShowPaymentModal(true);
+                    }
+                })
+                .catch(console.error);
+        }
+    }, [searchParams, isAuthenticated]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -70,7 +110,6 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
 
     const uploadToImageKit = async (file: File): Promise<string> => {
         try {
-            // get authentication parameters
             const { token, expire, signature, publicKey } =
                 await getUploadAuthParams();
 
@@ -83,7 +122,6 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                 signature,
                 publicKey,
                 onProgress: (event) => {
-                    // update progress if needed
                     console.log(
                         `Upload progress: ${(event.loaded / event.total) * 100
                         }%`
@@ -111,14 +149,25 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
             setIsUploading(true);
 
             try {
-                const usage = await checkUsage();
+                if (isAuthenticated) {
+                    const usage = await checkUsage();
 
-                if (!usage.canUpload) {
-                    setShowPaymentModal(true);
-                    setIsUploading(false);
-                    return;
+                    if (!usage.canUpload) {
+                        setShowPaymentModal(true);
+                        setIsUploading(false);
+                        return;
+                    }
+                    await updateUsage();
+                } else {
+                    const usage = await checkFreeUsage();
+
+                    if (!usage.canUpload) {
+                        setShowPaymentModal(true);
+                        setIsUploading(false);
+                        return;
+                    }
+                    await updateFreeUsage();
                 }
-                await updateUsage();
 
                 // upload to imagekit
                 const imageUrl = await uploadToImageKit(imageFile);
@@ -142,12 +191,37 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
         return data;
     };
 
+    const checkFreeUsage = async () => {
+        const response = await fetch("/api/free-usage");
+        if (!response.ok) {
+            throw new Error("Failed to check free usage");
+        }
+        const data = await response.json();
+        setUsageData(data);
+        return data;
+    };
+
+    const updateFreeUsage = async () => {
+        const response = await fetch("/api/free-usage", { method: "POST" });
+        if (!response.ok) {
+            const errorData = await response.json();
+            if (response.status === 403) {
+                setUsageData(errorData);
+                setShowPaymentModal(true);
+                throw new Error("Free usage limit reached");
+            }
+            throw new Error("Failed to update free usage");
+        }
+        const data = await response.json();
+        setUsageData(data);
+        return data;
+    };
+
     const updateUsage = async () => {
         const response = await fetch("/api/usage", { method: "POST" });
         if (!response.ok) {
             const errorData = await response.json();
             if (response.status === 403) {
-                // usage limit reached
                 setUsageData(errorData);
                 setShowPaymentModal(true);
                 throw new Error("Usage limit reached");
@@ -161,7 +235,11 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
 
     const handlePaymentModalClose = () => {
         setShowPaymentModal(false);
-        checkUsage().catch(console.error);
+        if (isAuthenticated) {
+            checkUsage().catch(console.error);
+        } else {
+            checkFreeUsage().catch(console.error);
+        }
     };
 
     const clearImage = () => {
@@ -302,10 +380,14 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                 onClose={handlePaymentModalClose}
                 onUpgrade={() => {
                     handlePaymentModalClose();
-                    checkUsage().catch(console.error);
+                    if (isAuthenticated) {
+                        checkUsage().catch(console.error);
+                    }
                 }}
                 usageCount={usageData?.usageCount || 0}
                 usageLimit={usageData?.usageLimit || 3}
+                plan={selectedPlan}
+                isAuthenticated={isAuthenticated}
             />
         </motion.div>
     );
