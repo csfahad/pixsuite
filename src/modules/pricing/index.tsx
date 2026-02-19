@@ -6,6 +6,7 @@ import { Check, Crown, Star, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import PaymentModal from "@/components/modals/payment-modal";
+import { getUpgradePriceDisplayUSD } from "@/lib/plans";
 
 const plans = [
     {
@@ -171,6 +172,20 @@ export default function Pricing() {
         checkUsage().catch(console.error);
     };
 
+    const getProPlanPrice = () => {
+        const currentPlan = (usageData?.plan as "Free" | "Lite" | "Pro") || "Free";
+        if (currentPlan === "Lite") {
+            return `$${getUpgradePriceDisplayUSD("Lite", "Pro")}`;
+        }
+        return "$29";
+    };
+
+    // check if Pro plan should show pro-rata pricing
+    const isProPlanProRata = () => {
+        const currentPlan = (usageData?.plan as "Free" | "Lite" | "Pro") || "Free";
+        return currentPlan === "Lite";
+    };
+
     return (
         <section id="pricing" className="py-24 relative overflow-hidden">
             {/* Background effects */}
@@ -257,11 +272,20 @@ export default function Pricing() {
 
                                     <div className="mb-6">
                                         <span className="text-5xl font-bold text-foreground">
-                                            {plan.price}
+                                            {plan.name === "Pro" && isProPlanProRata()
+                                                ? getProPlanPrice()
+                                                : plan.price}
                                         </span>
                                         <span className="text-muted-foreground ml-2">
                                             /{plan.period}
                                         </span>
+                                        {plan.name === "Pro" && isProPlanProRata() && (
+                                            <div className="mt-2">
+                                                <span className="text-xs text-primary font-medium">
+                                                    Pro-rata upgrade from Lite
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -350,6 +374,7 @@ export default function Pricing() {
                 usageCount={usageData?.usageCount || 0}
                 usageLimit={usageData?.usageLimit || 3}
                 plan={selectedPlan}
+                currentPlan={(usageData?.plan as "Free" | "Lite" | "Pro") || "Free"}
                 isAuthenticated={isAuthenticated}
             />
         </section>

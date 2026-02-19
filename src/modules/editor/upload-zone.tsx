@@ -387,6 +387,7 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                 usageCount={usageData?.usageCount || 0}
                 usageLimit={usageData?.usageLimit || 3}
                 plan={selectedPlan}
+                currentPlan={(usageData?.plan as "Free" | "Lite" | "Pro") || "Free"}
                 isAuthenticated={isAuthenticated}
             />
         </motion.div>
