@@ -198,20 +198,6 @@
         @apply bg-background text-foreground;
         letter-spacing: var(--tracking-normal);
     }
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: var(--color-muted);
-    }
-    ::-webkit-scrollbar-thumb {
-        background: var(--color-primary);
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: hsl(192 100% 70%);
-    }
 }
 
 /* ===== UTILITIES (ported helpers) ===== */
