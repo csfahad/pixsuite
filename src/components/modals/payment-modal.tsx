@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Crown, LogIn, Star, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getUpgradePriceDisplay } from "@/lib/plans";
 
 declare global {
     interface Window {
@@ -18,6 +19,7 @@ interface PaymentModalProps {
     usageCount: number;
     usageLimit: number;
     plan?: "Lite" | "Pro";
+    currentPlan?: "Free" | "Lite" | "Pro";
     isAuthenticated?: boolean;
 }
 
@@ -28,6 +30,7 @@ export default function PaymentModal({
     usageCount,
     usageLimit,
     plan = "Lite",
+    currentPlan = "Free",
     isAuthenticated = true,
 }: PaymentModalProps) {
     const [isLoading, setIsLoading] = useState(false);
@@ -189,8 +192,9 @@ export default function PaymentModal({
                                 Upgrade to {plan}
                             </h2>
                             <p className="text-muted-foreground">
-                                You've used {usageCount}/{usageLimit} free
-                                uploads
+                                {currentPlan === "Free"
+                                    ? `You've used ${usageCount}/${usageLimit} free uploads`
+                                    : `You've used ${usageCount}/${usageLimit} of your ${currentPlan} plan`}
                             </p>
                         </div>
 
@@ -291,12 +295,19 @@ export default function PaymentModal({
                                 </p>
                                 <div className="flex items-center justify-center space-x-2">
                                     <span className="text-3xl font-bold text-foreground">
-                                        {plan === "Pro" ? "₹2,900" : "₹999"}
+                                        {`₹${getUpgradePriceDisplay(currentPlan, plan)}`}
                                     </span>
                                     <span className="text-muted-foreground">
                                         /month
                                     </span>
                                 </div>
+                                <p className="text-sm text-muted-foreground">
+                                    {currentPlan === "Lite" && plan === "Pro" && (
+                                        <span className="block text-primary font-medium">
+                                            (Pro-rata upgrade)
+                                        </span>
+                                    )}
+                                </p>
                             </div>
                         </div>
 
