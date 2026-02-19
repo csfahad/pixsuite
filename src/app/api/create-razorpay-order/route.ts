@@ -2,6 +2,7 @@ import Razorpay from "razorpay";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUpgradeAmount } from "@/lib/plans";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
@@ -60,11 +61,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const amount = planType === "Lite" ? 99900 : 290000;
+        const fromPlan = (user.plan as "Free" | "Lite" | "Pro");
+        const amount = getUpgradeAmount(fromPlan, planType);
 
         const receipt = `rcpt_${user.id.slice(-10)}_${Date.now().toString().slice(-8)}`;
 
-        // create razorpay order
+        // create razorpay order (store fromPlan and usageCount for pro-rata upgrade logic)
         const options = {
             amount: amount,
             currency: "INR",
@@ -73,6 +75,8 @@ export async function POST(request: NextRequest) {
                 userId: user.id,
                 userEmail: user.email,
                 plan: planType,
+                fromPlan: fromPlan,
+                usageCount: String(user.usageCount ?? 0),
             },
         };
 

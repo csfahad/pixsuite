@@ -2,6 +2,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUpgradedUsage } from "@/lib/plans";
 
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET!;
 
@@ -48,7 +49,9 @@ export async function POST(request: NextRequest) {
             try {
                 const order = await razorpay.orders.fetch(orderId);
                 const userId = order.notes?.userId;
-                const planType = order.notes?.plan || "Lite";
+                const planType = (order.notes?.plan || "Lite") as "Lite" | "Pro";
+                const fromPlan = (order.notes?.fromPlan || "Free") as "Free" | "Lite" | "Pro";
+                const usageCount = parseInt(String(order.notes?.usageCount || "0"), 10) || 0;
 
                 if (!userId) {
                     console.error("User ID not found in order notes");
@@ -72,19 +75,24 @@ export async function POST(request: NextRequest) {
                     );
                 }
 
-                // set usage limit based on plan
-                const usageLimit = planType === "Lite" ? 1000 : 10000;
+                // compute usage: Free→paid resets to 0; Lite→Pro adds remaining quota
+                const { usageCount: newUsageCount, usageLimit } = getUpgradedUsage(
+                    fromPlan,
+                    planType,
+                    usageCount
+                );
 
                 // calculate expiration date (1 month from now)
                 const subscriptionExpiresAt = new Date();
                 subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1);
 
-                // update user plan and set expiration
+                // update user plan, usage (reset on upgrade), and expiration
                 await prisma.users.update({
                     where: { id: user.id },
                     data: {
                         plan: planType === "Lite" ? "Lite" : "Pro",
-                        usageLimit: usageLimit,
+                        usageLimit,
+                        usageCount: newUsageCount,
                         razorpayCustomerId: paymentId,
                         subscriptionExpiresAt: subscriptionExpiresAt,
                     },

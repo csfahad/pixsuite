@@ -3,6 +3,7 @@ import Razorpay from "razorpay";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUpgradedUsage } from "@/lib/plans";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
@@ -56,23 +57,30 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // get plan from order notes
+        // get plan and upgrade context from order notes (captured at order creation)
         const order = await razorpay.orders.fetch(razorpay_order_id);
-        const planType = order.notes?.plan || "Lite";
+        const planType = (order.notes?.plan || "Lite") as "Lite" | "Pro";
+        const fromPlan = (order.notes?.fromPlan || "Free") as "Free" | "Lite" | "Pro";
+        const usageCount = parseInt(String(order.notes?.usageCount || "0"), 10) || 0;
 
-        // set usage limit based on plan
-        const usageLimit = planType === "Lite" ? 1000 : 10000;
+        // compute usage: Free→paid resets to 0; Lite→Pro adds remaining quota
+        const { usageCount: newUsageCount, usageLimit } = getUpgradedUsage(
+            fromPlan,
+            planType,
+            usageCount
+        );
 
         // calculate expiration date (1 month from now)
         const subscriptionExpiresAt = new Date();
         subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1);
 
-        // update user plan and set expiration
+        // update user plan, usage (reset on upgrade), and expiration
         await prisma.users.update({
             where: { id: user.id },
             data: {
                 plan: planType === "Lite" ? "Lite" : "Pro",
-                usageLimit: usageLimit,
+                usageLimit,
+                usageCount: newUsageCount,
                 razorpayCustomerId: razorpay_payment_id,
                 subscriptionExpiresAt: subscriptionExpiresAt,
             },
