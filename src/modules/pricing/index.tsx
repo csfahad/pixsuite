@@ -5,6 +5,7 @@ import { signIn, useSession } from "next-auth/react";
 import { Check, Crown, Star, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { GlowingEffect } from "@/components/ui/glowing-effect";
 import PaymentModal from "@/components/modals/payment-modal";
 import { getUpgradePriceDisplayUSD } from "@/lib/plans";
 
@@ -226,9 +227,18 @@ export default function Pricing() {
                             viewport={{ once: true }}
                             transition={{ duration: 0.8, delay: index * 0.2 }}
                             whileHover={{ scale: 1.02, y: -5 }}
-                            className={`relative group ${plan.popular ? "lg:-mt-8" : ""
+                            className={`relative group rounded-xl ${plan.popular ? "lg:-mt-8" : ""
                                 }`}
                         >
+                            <GlowingEffect
+                                blur={0}
+                                borderWidth={3}
+                                spread={80}
+                                glow={true}
+                                disabled={false}
+                                proximity={64}
+                                inactiveZone={0.01}
+                            />
                             {plan.popular && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
                                     <div className="bg-primary/80 px-6 py-2 rounded-lg text-sm font-bold text-background">
