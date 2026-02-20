@@ -68,6 +68,22 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // skip transfer for paid users — their usage was reset at subscription time
+        const isSubscriptionActive = user.subscriptionExpiresAt
+            ? new Date(user.subscriptionExpiresAt) > new Date()
+            : false;
+
+        if (user.plan !== "Free" && isSubscriptionActive) {
+            // clean up: delete the anonymous session so it never interferes again
+            await prisma.anonymous_sessions.delete({
+                where: { id: anonSession.id },
+            });
+            return NextResponse.json({
+                transferred: false,
+                message: "Paid user — anonymous session cleaned up",
+            });
+        }
+
         // transfer: use the higher of the two usage counts
         const newUsageCount = Math.max(user.usageCount, anonSession.usageCount);
 
