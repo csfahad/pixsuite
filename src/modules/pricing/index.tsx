@@ -238,6 +238,7 @@ export default function Pricing() {
                                 disabled={false}
                                 proximity={64}
                                 inactiveZone={0.01}
+                                alwaysActive={plan.popular}
                             />
                             {plan.popular && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">

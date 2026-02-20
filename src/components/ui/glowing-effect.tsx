@@ -15,6 +15,7 @@ interface GlowingEffectProps {
     disabled?: boolean;
     movementDuration?: number;
     borderWidth?: number;
+    alwaysActive?: boolean;
 }
 const GlowingEffect = memo(
     ({
@@ -28,6 +29,7 @@ const GlowingEffect = memo(
         movementDuration = 2,
         borderWidth = 1,
         disabled = true,
+        alwaysActive = false,
     }: GlowingEffectProps) => {
         const containerRef = useRef<HTMLDivElement>(null);
         const lastPosition = useRef({ x: 0, y: 0 });
@@ -61,7 +63,9 @@ const GlowingEffect = memo(
                     const inactiveRadius = 0.5 * Math.min(width, height) * inactiveZone;
 
                     if (distanceFromCenter < inactiveRadius) {
-                        element.style.setProperty("--active", "0");
+                        if (!alwaysActive) {
+                            element.style.setProperty("--active", "0");
+                        }
                         return;
                     }
 
@@ -71,7 +75,7 @@ const GlowingEffect = memo(
                         mouseY > top - proximity &&
                         mouseY < top + height + proximity;
 
-                    element.style.setProperty("--active", isActive ? "1" : "0");
+                    element.style.setProperty("--active", isActive || alwaysActive ? "1" : "0");
 
                     if (!isActive) return;
 
@@ -94,7 +98,7 @@ const GlowingEffect = memo(
                     });
                 });
             },
-            [inactiveZone, proximity, movementDuration]
+            [inactiveZone, proximity, movementDuration, alwaysActive]
         );
 
         useEffect(() => {
@@ -134,7 +138,7 @@ const GlowingEffect = memo(
                             "--blur": `${blur}px`,
                             "--spread": spread,
                             "--start": "0",
-                            "--active": "0",
+                            "--active": alwaysActive ? "1" : "0",
                             "--glowingeffect-border-width": `${borderWidth}px`,
                             "--repeating-conic-gradient-times": "5",
                             "--gradient":
