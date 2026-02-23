@@ -3,7 +3,6 @@
 import { signOut, useSession } from "next-auth/react"
 import {
     BadgeCheckIcon,
-    BellIcon,
     CreditCardIcon,
     ImagePlus,
     LogOutIcon,
@@ -60,18 +59,18 @@ export default function UserInfo() {
                     <DropdownMenuSeparator />
                 </Link>
                 <DropdownMenuGroup>
-                    <DropdownMenuItem>
-                        <BadgeCheckIcon />
-                        Account
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <CreditCardIcon />
-                        Billing
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <BellIcon />
-                        Notifications
-                    </DropdownMenuItem>
+                    <Link href="/account">
+                        <DropdownMenuItem>
+                            <BadgeCheckIcon />
+                            Account
+                        </DropdownMenuItem>
+                    </Link>
+                    <Link href="/account?tab=plan">
+                        <DropdownMenuItem>
+                            <CreditCardIcon />
+                            Billing
+                        </DropdownMenuItem>
+                    </Link>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={handleSignOut}>

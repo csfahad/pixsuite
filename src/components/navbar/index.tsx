@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import {
     BadgeCheckIcon,
-    BellIcon,
     CreditCardIcon,
     ImagePlus,
     LogOutIcon,
@@ -246,6 +245,10 @@ export default function Navbar() {
                                             </button>
                                             <button
                                                 type="button"
+                                                onClick={() => {
+                                                    router.push("/account");
+                                                    setMenuState(false);
+                                                }}
                                                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-muted/70"
                                             >
                                                 <BadgeCheckIcon className="h-4 w-4" />
@@ -253,17 +256,14 @@ export default function Navbar() {
                                             </button>
                                             <button
                                                 type="button"
+                                                onClick={() => {
+                                                    router.push("/account?tab=plan");
+                                                    setMenuState(false);
+                                                }}
                                                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-muted/70"
                                             >
                                                 <CreditCardIcon className="h-4 w-4" />
                                                 <span>Billing</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-muted/70"
-                                            >
-                                                <BellIcon className="h-4 w-4" />
-                                                <span>Notifications</span>
                                             </button>
                                             <button
                                                 type="button"
