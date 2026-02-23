@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -10,7 +10,6 @@ import {
     Mail,
     Calendar,
     Clock,
-    Shield,
     Sparkles,
     Zap,
     Crown,
@@ -93,6 +92,20 @@ const planConfig = {
 };
 
 export default function AccountPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+                </div>
+            }
+        >
+            <AccountPageContent />
+        </Suspense>
+    );
+}
+
+function AccountPageContent() {
     const { data: session, status: sessionStatus } = useSession();
     const router = useRouter();
     const searchParams = useSearchParams();
