@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { Crown, ImageIcon, Loader2, Upload, X } from "lucide-react";
 import {
     ImageKitInvalidRequestError,
@@ -10,6 +10,7 @@ import {
     upload,
 } from "@imagekit/next";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import PaymentModal from "@/components/modals/payment-modal";
 
 interface UploadZoneProps {
@@ -50,13 +51,11 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
         }
     }, [isAuthenticated]);
 
-    // auto-open payment modal after OAuth redirect
     useEffect(() => {
         const upgradePlan = searchParams.get("showUpgrade");
         if (upgradePlan && isAuthenticated) {
             router.replace("/editor", { scroll: false });
 
-            // check if user already has an active paid plan
             fetch("/api/usage")
                 .then((res) => res.json())
                 .then((data) => {
@@ -169,7 +168,6 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                     await updateFreeUsage();
                 }
 
-                // upload to imagekit
                 const imageUrl = await uploadToImageKit(imageFile);
                 setUploadedImage(imageUrl);
                 onImageUpload(imageUrl);
@@ -247,131 +245,210 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
         onImageUpload("");
     };
 
+    const usagePercent = usageData
+        ? (usageData.usageCount / usageData.usageLimit) * 100
+        : 0;
+
     return (
         <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="relative"
         >
-            {uploadedImage ? (
-                <div className="relative glass rounded-lg p-4 border border-card-border">
-                    <button
-                        onClick={clearImage}
-                        className="absolute top-2 right-2 z-10 p-1 bg-background/80 rounded-full hover:bg-destructive/20 transition-colors"
+            <AnimatePresence mode="wait">
+                {uploadedImage ? (
+                    /* Uploaded Preview */
+                    <motion.div
+                        key="preview"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{
+                            type: "spring",
+                            stiffness: 300,
+                            damping: 25,
+                        }}
+                        className="relative group rounded-xl overflow-hidden border border-border"
                     >
-                        <X className="h-4 w-4 text-foreground hover:text-destructive" />
-                    </button>
+                        <button
+                            onClick={clearImage}
+                            className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-all duration-200 cursor-pointer"
+                        >
+                            <X className="h-3.5 w-3.5 text-foreground hover:text-destructive" />
+                        </button>
 
-                    <div className="aspect-square rounded-lg overflow-hidden">
-                        <img
-                            src={uploadedImage}
-                            alt="Uploaded Preview"
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
+                        <div className="aspect-square overflow-hidden">
+                            <motion.img
+                                src={uploadedImage}
+                                alt="Uploaded Preview"
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                whileHover={{ scale: 1.03 }}
+                            />
+                        </div>
 
-                    <div className="mt-3 text-center">
-                        <p className="text-sm font-medium text-foreground">
-                            {uploadedImage.startsWith("data:")
-                                ? "Local preview"
-                                : "Uploaded to cloud"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            Ready for AI magic
-                        </p>
-                    </div>
-                </div>
-            ) : (
-                <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`shadow-glass rounded-lg p-8 border-2 border-dashed border-primary-800 transition-all duration-300 cursor-pointer ${isDragOver
-                        ? "border-primary bg-primary/5 scale-105"
-                        : "border-card-border hover:border-primary/50 hover:bg-primary/5"
-                        }`}
-                >
-                    <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        id="file-upload"
-                    />
-
-                    <label
-                        htmlFor="file-upload"
-                        className="cursor-pointer block text-center"
+                        <div className="p-2.5 bg-muted/50 text-center space-y-0.5">
+                            <p className="text-xs font-medium text-foreground">
+                                {uploadedImage.startsWith("data:")
+                                    ? "Local preview"
+                                    : "Ready to edit"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                                Pick a tool below
+                            </p>
+                        </div>
+                    </motion.div>
+                ) : (
+                    /* Drop Zone */
+                    <motion.div
+                        key="dropzone"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
                     >
-                        <motion.div
-                            animate={isDragOver ? { scale: 1.1 } : { scale: 1 }}
-                            className="mb-4"
+                        <div
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            className={`relative rounded-xl p-5 border-2 border-dashed transition-all duration-300 cursor-pointer ${isDragOver
+                                ? "border-primary bg-primary/5 scale-[1.02]"
+                                : "border-border hover:border-primary/40 hover:bg-muted/30"
+                                }`}
                         >
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-linear-to-br from-primary/20 to-secondary/20 mb-4">
-                                {isUploading ? (
-                                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                                ) : isDragOver ? (
-                                    <Upload className="w-8 h-8 text-primary animate-bounce" />
-                                ) : (
-                                    <ImageIcon className="w-8 h-8 text-primary" />
-                                )}
-                            </div>
-                        </motion.div>
-
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                            {isUploading
-                                ? "Uploading to cloud..."
-                                : isDragOver
-                                    ? "Drop your photo here"
-                                    : "Upload Photo"}
-                        </h3>
-
-                        <p className="text-muted-foreground text-sm mb-4">
-                            {isUploading
-                                ? "Please wait while we upload your image"
-                                : "Drag & drop or click to browse"}
-                        </p>
-
-                        <Button
-                            variant="outline"
-                            className="glass border-card-border cursor-pointer"
-                            disabled={isUploading}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                document.getElementById("file-upload")?.click();
-                            }}
-                        >
-                            {isUploading ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Uploading...
-                                </>
-                            ) : (
-                                <>
-                                    <Upload className="h-4 w-4 mr-2" />
-                                    Browse Files
-                                </>
+                            {/* Animated gradient border on drag */}
+                            {isDragOver && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="absolute inset-0 rounded-xl pointer-events-none"
+                                    style={{
+                                        background:
+                                            "linear-gradient(135deg, oklch(0.7 0.15 250 / 0.08), oklch(0.7 0.15 300 / 0.08))",
+                                    }}
+                                />
                             )}
-                        </Button>
-                    </label>
-                </div>
-            )}
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileSelect}
+                                className="hidden"
+                                id="file-upload"
+                            />
+
+                            <label
+                                htmlFor="file-upload"
+                                className="cursor-pointer block text-center relative z-10"
+                            >
+                                <motion.div
+                                    animate={
+                                        isDragOver
+                                            ? { scale: 1.1, y: -4 }
+                                            : { scale: 1, y: 0 }
+                                    }
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 300,
+                                        damping: 20,
+                                    }}
+                                    className="mb-3"
+                                >
+                                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-muted mb-2">
+                                        {isUploading ? (
+                                            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                        ) : isDragOver ? (
+                                            <Upload className="w-5 h-5 text-primary animate-bounce" />
+                                        ) : (
+                                            <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                                        )}
+                                    </div>
+                                </motion.div>
+
+                                <h3 className="text-sm font-semibold text-foreground mb-1">
+                                    {isUploading
+                                        ? "Uploading..."
+                                        : isDragOver
+                                            ? "Drop it!"
+                                            : "Upload Photo"}
+                                </h3>
+
+                                <p className="text-[11px] text-muted-foreground mb-3">
+                                    {isUploading
+                                        ? "Please wait"
+                                        : "Drag & drop or click"}
+                                </p>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs cursor-pointer"
+                                    disabled={isUploading}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        document
+                                            .getElementById("file-upload")
+                                            ?.click();
+                                    }}
+                                >
+                                    {isUploading ? (
+                                        <>
+                                            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                            Uploading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload className="h-3 w-3 mr-1.5" />
+                                            Browse
+                                        </>
+                                    )}
+                                </Button>
+                            </label>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Usage Info */}
             {usageData && (
-                <div className="mt-4 text-center">
-                    <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
-                        <span>
-                            Usage: {usageData.usageCount}/{usageData.usageLimit}
-                        </span>
+                <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="mt-3 space-y-2"
+                >
+                    <div className="flex items-center justify-between text-[10px]">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <span>
+                                {usageData.usageCount}/{usageData.usageLimit}
+                            </span>
+                            {usageData.plan !== "Free" && (
+                                <Badge
+                                    variant="outline"
+                                    className="text-[9px] px-1 py-0 h-4"
+                                >
+                                    {usageData.plan}
+                                </Badge>
+                            )}
+                        </div>
                         {usageData.plan === "Free" && (
-                            <Crown className="h-3 w-3 text-primary" />
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                                <Crown className="h-2.5 w-2.5 text-primary" />
+                                <span>Free</span>
+                            </div>
                         )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Supports JPG, PNG, WEBP up to 10MB
+                    {/* Mini progress bar */}
+                    <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                            className="h-full bg-primary rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(usagePercent, 100)}%` }}
+                            transition={{ duration: 0.6, ease: "easeOut" }}
+                        />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground text-center">
+                        JPG, PNG, WEBP up to 10MB
                     </p>
-                </div>
+                </motion.div>
             )}
 
             {/* Payment Modal */}
