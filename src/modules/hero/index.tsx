@@ -203,7 +203,7 @@ export default function Hero() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.6 }}
-                            className="mt-8 grid grid-cols-1 md:grid-cols-3 items-start justify-items-center-safe gap-2 md:gap-0 md:space-x-6 text-sm text-muted-foreground"
+                            className="mt-8 grid grid-cols-1 md:grid-cols-3 items-start justify-items-start md:justify-items-center gap-2 md:gap-0 md:space-x-6 text-sm text-muted-foreground w-fit md:w-auto mx-auto"
                         >
                             <div className="flex items-center space-x-2">
                                 <div className="w-2 h-2 bg-chart-1 rounded-full animate-pulse" />
