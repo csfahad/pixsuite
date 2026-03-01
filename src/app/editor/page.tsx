@@ -2,19 +2,32 @@
 
 import {
     CheckCircle,
+    ChevronDown,
     Clock,
     Crop,
     Download,
     Expand,
+    Layers,
     Loader2,
     Scissors,
+    Sparkles,
     Type,
+    Wand2,
+    X,
     Zap,
 } from "lucide-react";
 import { Suspense, useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import UploadZone from "../../modules/editor/upload-zone";
 import CanvasEditor from "../../modules/editor/canvas-editor";
 import Footer from "@/components/footer";
@@ -29,94 +42,112 @@ interface ProcessingJob {
     result?: string;
 }
 
-const primaryTools = [
+interface ToolItem {
+    id: string;
+    name: string;
+    icon: React.ComponentType<{ className?: string }>;
+    description: string;
+    hasPrompt?: boolean;
+}
+
+interface ToolCategory {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    tools: ToolItem[];
+}
+
+const toolCategories: ToolCategory[] = [
     {
-        id: "e-bgremove",
-        name: "Remove Background",
-        icon: Scissors,
-        color: "primary",
-        description: "Remove background with AI",
+        label: "AI Transform",
+        icon: Wand2,
+        tools: [
+            {
+                id: "e-bgremove",
+                name: "Remove Background",
+                icon: Scissors,
+                description: "Remove background with AI",
+            },
+            {
+                id: "e-removedotbg",
+                name: "Remove BG (Pro)",
+                icon: Scissors,
+                description: "High-quality background removal",
+            },
+            {
+                id: "e-changebg",
+                name: "Change Background",
+                icon: Expand,
+                description: "Replace background with AI",
+                hasPrompt: true,
+            },
+            {
+                id: "e-edit",
+                name: "AI Edit",
+                icon: Type,
+                description: "Edit image with text prompts",
+                hasPrompt: true,
+            },
+            {
+                id: "bg-genfill",
+                name: "Generative Fill",
+                icon: Expand,
+                description: "Fill empty areas with AI",
+                hasPrompt: true,
+            },
+        ],
     },
     {
-        id: "e-removedotbg",
-        name: "Remove Background (Pro)",
-        icon: Scissors,
-        color: "secondary",
-        description: "High-quality background removal",
+        label: "Enhance",
+        icon: Sparkles,
+        tools: [
+            {
+                id: "e-dropshadow",
+                name: "AI Drop Shadow",
+                icon: Zap,
+                description: "Add realistic shadows",
+            },
+            {
+                id: "e-retouch",
+                name: "AI Retouch",
+                icon: Zap,
+                description: "Enhance and retouch image",
+            },
+            {
+                id: "e-upscale",
+                name: "AI Upscale 2x",
+                icon: Zap,
+                description: "Upscale image quality",
+            },
+            {
+                id: "e-genvar",
+                name: "Generate Variations",
+                icon: Type,
+                description: "Create image variations",
+                hasPrompt: true,
+            },
+        ],
     },
     {
-        id: "e-changebg",
-        name: "Change Background",
-        icon: Expand,
-        color: "primary",
-        description: "Replace background with AI",
-        hasPrompt: true,
-    },
-    {
-        id: "e-edit",
-        name: "AI Edit",
-        icon: Type,
-        color: "secondary",
-        description: "Edit image with text prompts",
-        hasPrompt: true,
-    },
-    {
-        id: "bg-genfill",
-        name: "Generative Fill",
-        icon: Expand,
-        color: "primary",
-        description: "Fill empty areas with AI",
-        hasPrompt: true,
+        label: "Crop & Resize",
+        icon: Crop,
+        tools: [
+            {
+                id: "e-crop-face",
+                name: "Face Crop",
+                icon: Crop,
+                description: "Smart face-focused cropping",
+            },
+            {
+                id: "e-crop-smart",
+                name: "Smart Crop",
+                icon: Crop,
+                description: "AI-powered intelligent cropping",
+            },
+        ],
     },
 ];
 
-const secondaryTools = [
-    {
-        id: "e-dropshadow",
-        name: "AI Drop Shadow",
-        icon: Zap,
-        color: "secondary",
-        description: "Add realistic shadows",
-    },
-    {
-        id: "e-retouch",
-        name: "AI Retouch",
-        icon: Zap,
-        color: "primary",
-        description: "Enhance and retouch image",
-    },
-    {
-        id: "e-upscale",
-        name: "AI Upscale 2x",
-        icon: Zap,
-        color: "secondary",
-        description: "Upscale image quality",
-    },
-    {
-        id: "e-genvar",
-        name: "Generate Variations",
-        icon: Type,
-        color: "primary",
-        description: "Create image variations",
-        hasPrompt: true,
-    },
-    {
-        id: "e-crop-face",
-        name: "Face Crop",
-        icon: Crop,
-        color: "secondary",
-        description: "Smart face-focused cropping",
-    },
-    {
-        id: "e-crop-smart",
-        name: "Smart Crop",
-        icon: Crop,
-        color: "primary",
-        description: "AI-powered intelligent cropping",
-    },
-];
-
-const allTools = [...primaryTools, ...secondaryTools];
+const allTools = toolCategories.flatMap((cat) => cat.tools);
 
 export default function Editor() {
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -126,6 +157,10 @@ export default function Editor() {
     const [activeEffects, setActiveEffects] = useState<Set<string>>(new Set());
     const [promptText, setPromptText] = useState<string>("");
     const [showPromptInput, setShowPromptInput] = useState<boolean>(false);
+    const [promptToolId, setPromptToolId] = useState<string | null>(null);
+    const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+        new Set()
+    );
 
     const handleImageUpload = (imageUrl: string) => {
         setUploadedImage(imageUrl);
@@ -134,17 +169,11 @@ export default function Editor() {
     };
 
     const handlePromptSubmit = async () => {
-        if (!promptText.trim()) return;
-
-        // find the tool that was clicked
-        const tool = allTools.find(
-            (t) => t.hasPrompt && !activeEffects.has(t.id)
-        );
-        if (!tool) return;
-
-        await applyEffect(tool.id, promptText);
+        if (!promptText.trim() || !promptToolId) return;
+        await applyEffect(promptToolId, promptText);
         setShowPromptInput(false);
         setPromptText("");
+        setPromptToolId(null);
     };
 
     const getImageKitTransform = (toolId: string, prompt?: string): string => {
@@ -177,7 +206,6 @@ export default function Editor() {
         if (!uploadedImage) return;
 
         const tool = allTools.find((t) => t.id === toolId);
-
         if (!tool) return;
 
         // toggle effect on/off
@@ -186,9 +214,7 @@ export default function Editor() {
             newActiveEffects.delete(toolId);
             setActiveEffects(newActiveEffects);
 
-            // remove effect from image
             const remainingEffects = Array.from(newActiveEffects);
-
             const newImageUrl =
                 remainingEffects.length > 0
                     ? `${uploadedImage}?tr=${remainingEffects
@@ -203,6 +229,7 @@ export default function Editor() {
         if (tool.hasPrompt) {
             setShowPromptInput(true);
             setPromptText("");
+            setPromptToolId(toolId);
             return;
         }
 
@@ -222,12 +249,10 @@ export default function Editor() {
 
         setCurrentJob(newJob);
 
-        // Apply effect to active effects
         const newActiveEffects = new Set(activeEffects);
         newActiveEffects.add(toolId);
         setActiveEffects(newActiveEffects);
 
-        // generate the imagekit transformation URL
         const allEffects = Array.from(newActiveEffects);
         const transforms = allEffects.map((effect) =>
             getImageKitTransform(effect, effect === toolId ? prompt : undefined)
@@ -235,26 +260,24 @@ export default function Editor() {
         const newImageUrl = `${uploadedImage}?tr=${transforms.join(",")}`;
 
         try {
-            // start polling the AI transformation URL to check when it's complete
             setCurrentJob((prev) =>
                 prev ? { ...prev, status: "processing", progress: 10 } : null
             );
 
             let attempts = 0;
-            const maxAttempts = 60; // 5 minutes max (5s intervals)
-            const pollInterval = 5000; // 5seconds / 5k ms
+            const maxAttempts = 60;
+            const pollInterval = 5000;
 
             const pollImageKit = async (): Promise<boolean> => {
                 attempts++;
 
                 try {
                     const response = await fetch(newImageUrl, {
-                        method: "HEAD", // only check headers, don't download image
-                        cache: "no-cache", // don't use cached version
+                        method: "HEAD",
+                        cache: "no-cache",
                     });
 
                     if (response.ok) {
-                        // AI transformation is complete
                         setProcessedImage(newImageUrl);
                         setCurrentJob((prev) =>
                             prev
@@ -274,7 +297,7 @@ export default function Editor() {
                         };
                         setEditHistory((prev) => [
                             completedJob,
-                            ...prev.slice(0, 2),
+                            ...prev.slice(0, 4),
                         ]);
                         return true;
                     }
@@ -284,12 +307,10 @@ export default function Editor() {
                     );
                 }
 
-                // update progress based on attempts
-                const progress = Math.min(10 + attempts * 1.5, 90); // 10% to 90%
+                const progress = Math.min(10 + attempts * 1.5, 90);
                 setCurrentJob((prev) => (prev ? { ...prev, progress } : null));
 
                 if (attempts >= maxAttempts) {
-                    // Timeout - mark as completed anyway
                     setProcessedImage(newImageUrl);
                     setCurrentJob((prev) =>
                         prev
@@ -305,19 +326,17 @@ export default function Editor() {
                     };
                     setEditHistory((prev) => [
                         completedJob,
-                        ...prev.slice(0, 2),
+                        ...prev.slice(0, 4),
                     ]);
                     return true;
                 }
 
-                // continue polling
                 await new Promise((resolve) =>
                     setTimeout(resolve, pollInterval)
                 );
                 return pollImageKit();
             };
 
-            // starting polling
             await pollImageKit();
         } catch (err) {
             console.error("Error applying effect:", err);
@@ -329,150 +348,131 @@ export default function Editor() {
 
     const handleExport = (format: string) => {
         if (!processedImage) return;
-
         saveAs(processedImage, `PixSuite-${Date.now()}.${format}`);
+    };
+
+    const toggleCategory = (label: string) => {
+        const updated = new Set(collapsedCategories);
+        if (updated.has(label)) {
+            updated.delete(label);
+        } else {
+            updated.add(label);
+        }
+        setCollapsedCategories(updated);
+    };
+
+    const isProcessing = currentJob?.status === "processing";
+
+    const getStatusSteps = () => {
+        if (!currentJob) return [];
+        const steps = [
+            { label: "Queued", done: true },
+            {
+                label: "Processing",
+                done:
+                    currentJob.status === "processing" ||
+                    currentJob.status === "completed",
+                active: currentJob.status === "processing",
+            },
+            {
+                label: "Completed",
+                done: currentJob.status === "completed",
+            },
+        ];
+        return steps;
     };
 
     return (
         <>
-            <section id="editor" className="pt-24 pb-18 relative overflow-hidden">
-                {/* Background effects */}
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+            <section
+                id="editor"
+                className="pt-24 pb-18 relative overflow-hidden"
+            >
+                {/* Ambient background */}
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+                </div>
 
                 <div className="container mx-auto max-w-6xl px-4 relative z-10">
+
+                    {/* Active Effects & Export Bar */}
                     <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8 }}
-                        className="text-center mb-12"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4 }}
+                        className="flex items-center justify-between mb-6"
                     >
-                        <h2 className="text-4xl lg:text-6xl font-bold mb-6">
-                            <span className="bg-primary bg-clip-text! text-transparent">
-                                Magic
-                            </span>
-                            <span className="text-foreground"> Studio</span>
-                        </h2>
-                        <p className="text-base md:text-xl text-muted-foreground max-w-3xl mx-auto">
-                            Upload your photo and transform it with AI-powered
-                            tools. See the magic happen in real-time.
-                        </p>
+                        <div className="flex items-center gap-3 flex-wrap">
+
+                            {/* Active effects badges */}
+                            <AnimatePresence mode="popLayout">
+                                {Array.from(activeEffects).map((effectId) => {
+                                    const tool = allTools.find(
+                                        (t) => t.id === effectId
+                                    );
+                                    return (
+                                        <motion.div
+                                            key={effectId}
+                                            initial={{
+                                                opacity: 0,
+                                                scale: 0.8,
+                                                x: -10,
+                                            }}
+                                            animate={{
+                                                opacity: 1,
+                                                scale: 1,
+                                                x: 0,
+                                            }}
+                                            exit={{
+                                                opacity: 0,
+                                                scale: 0.8,
+                                                x: -10,
+                                            }}
+                                            transition={{
+                                                type: "spring",
+                                                stiffness: 400,
+                                                damping: 25,
+                                            }}
+                                        >
+                                            <Badge
+                                                variant="secondary"
+                                                className="gap-1.5 py-1 px-2.5 cursor-pointer hover:bg-destructive/20 transition-colors"
+                                                onClick={() =>
+                                                    handleToolClick(effectId)
+                                                }
+                                            >
+                                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                                {tool?.name}
+                                                <X className="w-3 h-3 opacity-60" />
+                                            </Badge>
+                                        </motion.div>
+                                    );
+                                })}
+                            </AnimatePresence>
+                        </div>
                     </motion.div>
 
+                    {/* Main 3-Panel Layout */}
                     <div className="grid lg:grid-cols-4 gap-8">
-                        {/* upload area */}
-                        <motion.div
+                        {/* ======= LEFT PANEL — Upload ======= */}
+                        <motion.aside
                             initial={{ opacity: 0, x: -50 }}
                             whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }}
                             className="lg:col-span-1"
                         >
-                            <Suspense fallback={null}>
-                                <UploadZone onImageUpload={handleImageUpload} />
-                            </Suspense>
-
-                            {/* Toolbar */}
-                            <div className="mt-6 space-y-3">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">
-                                    AI Tools
-                                </h3>
-
-                                {/* Prompt Input */}
-                                {showPromptInput && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="space-y-3 p-4 glass rounded-lg border border-card-border"
-                                    >
-                                        <textarea
-                                            value={promptText}
-                                            onChange={(e) =>
-                                                setPromptText(e.target.value)
-                                            }
-                                            placeholder="Describe what you want to change..."
-                                            className="w-full p-3 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground resize-none"
-                                            rows={3}
-                                        />
-
-                                        <div className="flex gap-2">
-                                            <Button
-                                                onClick={handlePromptSubmit}
-                                                disabled={!promptText.trim()}
-                                                className="flex-1"
-                                            >
-                                                Apply
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setShowPromptInput(false)
-                                                }
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </div>
-                                    </motion.div>
-                                )}
-
-                                {primaryTools.map((tool) => {
-                                    const isActive = activeEffects.has(tool.id);
-                                    const isProcessing =
-                                        currentJob?.type === tool.id &&
-                                        currentJob.status === "processing";
-                                    const isQueued =
-                                        currentJob?.type === tool.id &&
-                                        currentJob.status === "processing";
-                                    const isDisabled =
-                                        !uploadedImage ||
-                                        currentJob?.status === "processing";
-
-                                    return (
-                                        <Button
-                                            key={tool.id}
-                                            variant={
-                                                isActive ? "default" : "outline"
-                                            }
-                                            className={`w-full justify-start shadow-glass py-6 transition-all ${isActive
-                                                ? "bg-primary text-primary-foreground border-primary"
-                                                : "border-gray-600 hover:border-primary/30"
-                                                }`}
-                                            onClick={() => handleToolClick(tool.id)}
-                                            disabled={isDisabled}
-                                            title={tool.description}
-                                        >
-                                            <tool.icon
-                                                className={`h-4 w-4 mr-2 ${isProcessing
-                                                    ? "animate-pulse"
-                                                    : ""
-                                                    }`}
-                                            />
-                                            <div className="flex-1 text-left">
-                                                <div className="font-medium">
-                                                    {tool.name}
-                                                </div>
-                                                {tool?.hasPrompt && (
-                                                    <div className="text-xs opacity-70">
-                                                        Requires Prompt
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {isActive && !isProcessing && (
-                                                <div className="w-2 h-2 bg-primary-foreground rounded-full" />
-                                            )}
-                                            {isQueued && (
-                                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" />
-                                            )}
-                                            {isProcessing && (
-                                                <Loader2 className="h-4 w-4 ml-auto animate-spin" />
-                                            )}
-                                        </Button>
-                                    );
-                                })}
+                            {/* Upload Zone */}
+                            <div className="mb-4">
+                                <Suspense fallback={null}>
+                                    <UploadZone
+                                        onImageUpload={handleImageUpload}
+                                    />
+                                </Suspense>
                             </div>
-                        </motion.div>
+                        </motion.aside>
 
-                        {/* Main Canvas */}
+                        {/* ======= CENTER — Canvas + Tools ======= */}
                         <motion.div
                             initial={{ opacity: 0, y: 50 }}
                             whileInView={{ opacity: 1, y: 0 }}
@@ -482,116 +482,232 @@ export default function Editor() {
                             <CanvasEditor
                                 originalImage={uploadedImage}
                                 processedImage={processedImage}
-                                isProcessing={currentJob?.status === "processing"}
+                                isProcessing={isProcessing ?? false}
                             />
 
-                            {/* Secondery Tools */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mt-6"
-                            >
-                                <h4 className="text-md font-semibold text-foreground mb-3">
-                                    Additional Tools
-                                </h4>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {secondaryTools.map((tool) => {
-                                        const isActive = activeEffects.has(tool.id);
-                                        const isProcessing =
-                                            currentJob?.type === tool.id &&
-                                            currentJob.status === "processing";
-                                        const isQueued =
-                                            currentJob?.type === tool.id &&
-                                            currentJob.status === "queued";
-                                        const isDisabled =
-                                            !uploadedImage ||
-                                            currentJob?.status === "processing";
+                            {/* Prompt Input */}
+                            <AnimatePresence>
+                                {showPromptInput && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                        className="overflow-hidden mt-4"
+                                    >
+                                        <div className="p-4 rounded-xl bg-muted/50 border border-border space-y-3">
+                                            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                                                <Sparkles className="w-3.5 h-3.5" />
+                                                <span>Describe your edit</span>
+                                            </div>
+                                            <textarea
+                                                value={promptText}
+                                                onChange={(e) => setPromptText(e.target.value)}
+                                                placeholder="e.g., Replace background with a sunset beach..."
+                                                className="w-full p-3 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+                                                rows={3}
+                                                autoFocus
+                                            />
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    onClick={handlePromptSubmit}
+                                                    disabled={!promptText.trim()}
+                                                    className="flex-1 gap-1.5 cursor-pointer"
+                                                >
+                                                    <Sparkles className="w-3.5 h-3.5" />
+                                                    Apply
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setShowPromptInput(false);
+                                                        setPromptToolId(null);
+                                                    }}
+                                                    className="cursor-pointer"
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
+                            {/* AI Tools — Categorized Grid Below Canvas */}
+                            <div className="mt-6 space-y-5">
+                                <TooltipProvider delayDuration={300}>
+                                    {toolCategories.map((category, catIdx) => {
+                                        const isCollapsed = collapsedCategories.has(category.label);
                                         return (
-                                            <Button
-                                                key={tool.id}
-                                                variant={
-                                                    isActive ? "default" : "outline"
-                                                }
-                                                size="sm"
-                                                className={`justify-start shadow-glass py-6 transition-all ${isActive
-                                                    ? "bg-primary text-primary-foreground border-primary"
-                                                    : "border-gray-600 hover:border-primary/30"
-                                                    }`}
-                                                onClick={() =>
-                                                    handleToolClick(tool.id)
-                                                }
-                                                disabled={isDisabled}
-                                                title={tool.description}
+                                            <motion.div
+                                                key={category.label}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.3, delay: catIdx * 0.08 }}
                                             >
-                                                <tool.icon
-                                                    className={`h-3 w-3 mr-2 ${isProcessing
-                                                        ? "animate-pulse"
-                                                        : ""
-                                                        }`}
-                                                />
-                                                <span className="text-xs md:text-sm">
-                                                    {tool.name}
-                                                </span>
-                                                {isActive && !isProcessing && (
-                                                    <div className="w-1.5 h-1.5 bg-primary-foreground rounded-full ml-auto" />
-                                                )}
-                                                {isProcessing && (
-                                                    <Loader2 className="h-3 w-3 ml-auto animate-spin" />
-                                                )}
-                                            </Button>
+                                                {/* Category Header */}
+                                                <button
+                                                    onClick={() => toggleCategory(category.label)}
+                                                    className="flex items-center gap-2 w-full mb-3 text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                                                >
+                                                    <category.icon className="w-4 h-4" />
+                                                    <span className="flex-1 text-left">{category.label}</span>
+                                                    <ChevronDown
+                                                        className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`}
+                                                    />
+                                                </button>
+
+                                                {/* Tools Grid */}
+                                                <AnimatePresence initial={false}>
+                                                    {!isCollapsed && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: "auto", opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={{ duration: 0.2 }}
+                                                            className="overflow-hidden"
+                                                        >
+                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                                {category.tools.map((tool, toolIdx) => {
+                                                                    const isActive = activeEffects.has(tool.id);
+                                                                    const isToolProcessing =
+                                                                        currentJob?.type === tool.id &&
+                                                                        currentJob.status === "processing";
+                                                                    const isDisabled = !uploadedImage || isProcessing;
+
+                                                                    return (
+                                                                        <Tooltip key={tool.id}>
+                                                                            <TooltipTrigger asChild>
+                                                                                <motion.button
+                                                                                    initial={{ opacity: 0, y: 8 }}
+                                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                                    transition={{ duration: 0.2, delay: toolIdx * 0.04 }}
+                                                                                    onClick={() => handleToolClick(tool.id)}
+                                                                                    disabled={isDisabled}
+                                                                                    className={`tool-card flex items-center gap-2.5 px-3 py-3 rounded-xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border transition-all group ${isActive
+                                                                                        ? "bg-primary text-primary-foreground border-primary shadow-lg"
+                                                                                        : "border-border hover:border-primary/30 hover:bg-muted/40"
+                                                                                        }`}
+                                                                                >
+                                                                                    <div
+                                                                                        className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isActive
+                                                                                            ? "bg-primary-foreground/20"
+                                                                                            : "bg-muted group-hover:bg-primary/10"
+                                                                                            }`}
+                                                                                    >
+                                                                                        {isToolProcessing ? (
+                                                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                        ) : (
+                                                                                            <tool.icon className="w-4 h-4" />
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <div className="text-sm font-medium truncate">
+                                                                                            {tool.name}
+                                                                                        </div>
+                                                                                        {tool.hasPrompt && (
+                                                                                            <div className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                                                                                                Prompt required
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    {isActive && !isToolProcessing && (
+                                                                                        <motion.div
+                                                                                            initial={{ scale: 0 }}
+                                                                                            animate={{ scale: 1 }}
+                                                                                            className="w-2 h-2 rounded-full bg-primary-foreground shrink-0"
+                                                                                        />
+                                                                                    )}
+                                                                                </motion.button>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent side="bottom" className="max-w-[200px]">
+                                                                                <p className="font-medium">{tool.name}</p>
+                                                                                <p className="text-xs opacity-80 mt-0.5">{tool.description}</p>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </motion.div>
                                         );
                                     })}
-                                </div>
-                            </motion.div>
+                                </TooltipProvider>
+                            </div>
                         </motion.div>
 
-                        {/* Right Panel - Job Status */}
-                        <motion.div
-                            initial={{ opacity: 0, x: 50 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            className="lg:col-span-1"
+                        {/* ======= RIGHT PANEL — Status & History ======= */}
+                        <motion.aside
+                            initial={{ opacity: 0, x: 30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.5, delay: 0.3 }}
+                            className="editor-panel p-5 lg:sticky lg:top-20 space-y-6"
                         >
-                            <div className="shadow-glass rounded-lg p-6 border border-primary/20">
-                                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center justify-center">
-                                    Job Status
-                                </h3>
+                            {/* Processing Status */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Layers className="w-4 h-4 text-muted-foreground" />
+                                    <h3 className="text-sm font-semibold text-foreground">
+                                        Processing
+                                    </h3>
+                                </div>
 
                                 {currentJob ? (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center space-x-3">
-                                            {currentJob.status === "processing" ? (
-                                                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                                            ) : currentJob.status ===
-                                                "completed" ? (
-                                                <CheckCircle className="h-5 w-5 text-primary" />
-                                            ) : currentJob.status === "queued" ? (
-                                                <Clock className="h-5 w-5 text-muted-foreground animate-pulse" />
-                                            ) : (
-                                                <Clock className="h-5 w-5 text-muted-foreground" />
-                                            )}
-                                            <div>
-                                                <p className="font-medium text-foreground capitalize">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="space-y-4"
+                                    >
+                                        {/* Job Info */}
+                                        <div className="flex items-center gap-3">
+                                            <div
+                                                className={`relative w-10 h-10 rounded-xl flex items-center justify-center ${currentJob.status ===
+                                                    "completed"
+                                                    ? "bg-primary/10"
+                                                    : currentJob.status ===
+                                                        "error"
+                                                        ? "bg-destructive/10"
+                                                        : "bg-muted"
+                                                    }`}
+                                            >
+                                                {currentJob.status ===
+                                                    "completed" ? (
+                                                    <CheckCircle className="w-5 h-5 text-primary" />
+                                                ) : currentJob.status ===
+                                                    "error" ? (
+                                                    <X className="w-5 h-5 text-destructive" />
+                                                ) : (
+                                                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                                )}
+                                                {currentJob.status ===
+                                                    "processing" && (
+                                                        <div className="absolute inset-0 rounded-xl border-2 border-primary/30 animate-ping" />
+                                                    )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-foreground truncate">
                                                     {allTools.find(
                                                         (t) =>
-                                                            t.id === currentJob.type
+                                                            t.id ===
+                                                            currentJob.type
                                                     )?.name ||
                                                         currentJob.type.replace(
                                                             "-",
                                                             " "
                                                         )}
                                                 </p>
-                                                <p className="text-sm text-muted-foreground capitalize">
+                                                <p className="text-xs text-muted-foreground">
                                                     {currentJob.status ===
                                                         "queued" &&
-                                                        "Preparing AI transformation..."}
+                                                        "Initializing..."}
                                                     {currentJob.status ===
                                                         "processing" &&
-                                                        `Processing with AI... (${currentJob.progress}%)`}
+                                                        `AI processing... ${Math.round(currentJob.progress)}%`}
                                                     {currentJob.status ===
                                                         "completed" &&
-                                                        "AI transformation completed!"}
+                                                        "Transformation complete ✨"}
                                                     {currentJob.status ===
                                                         "error" &&
                                                         "Processing failed"}
@@ -599,78 +715,192 @@ export default function Editor() {
                                             </div>
                                         </div>
 
+                                        {/* Progress Bar */}
                                         {(currentJob.status === "processing" ||
-                                            currentJob.status === "queued") && (
-                                                <div className="w-full bg-muted rounded-full h-2">
-                                                    <div
-                                                        className={`h-2 rounded-full transition-all duration-300 ${currentJob.status ===
-                                                            "queued"
-                                                            ? "bg-muted-foreground animate-pulse"
-                                                            : "bg-gradient-primary"
-                                                            }`}
-                                                        style={{
-                                                            width:
+                                            currentJob.status ===
+                                            "queued") && (
+                                                <div className="space-y-2">
+                                                    <div className="relative">
+                                                        <Progress
+                                                            value={
                                                                 currentJob.status ===
                                                                     "queued"
-                                                                    ? "100%"
-                                                                    : `${currentJob.progress}%`,
-                                                        }}
-                                                    />
-                                                    <div className="text-xs text-muted-foreground mt-1 text-center">
-                                                        {currentJob.status === "queued" &&
-                                                            "Initializing..."}
-                                                        {currentJob.status === "processing" &&
-                                                            "Waiting for AI to complete transformation..."}
+                                                                    ? undefined
+                                                                    : currentJob.progress
+                                                            }
+                                                            className="h-1.5"
+                                                        />
+                                                        {currentJob.status ===
+                                                            "queued" && (
+                                                                <div className="absolute inset-0 h-1.5 rounded-full overflow-hidden">
+                                                                    <div className="w-full h-full shimmer" />
+                                                                </div>
+                                                            )}
                                                     </div>
                                                 </div>
                                             )}
-                                    </div>
-                                ) : (
-                                    <p className="flex items-center justify-center text-muted-foreground text-sm">
-                                        Upload an image and select a tool to start
-                                    </p>
-                                )}
 
-                                {/* Edit History */}
-                                {editHistory?.length > 0 && (
-                                    <div className="mt-8">
-                                        <h4 className="text-sm font-semibold text-foreground mb-3">
-                                            Recent Edits
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {editHistory?.map((job) => (
-                                                <div
-                                                    key={job.id}
-                                                    className="flex items-center space-x-2 text-sm"
-                                                >
-                                                    <CheckCircle className="h-3 w-3 text-primary shrink-0" />
-                                                    <span className="text-muted-foreground capitalize">
-                                                        {job?.type?.replace(
-                                                            "-",
-                                                            " "
+                                        {/* Status Steps */}
+                                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                                            {getStatusSteps().map(
+                                                (step, i) => (
+                                                    <div
+                                                        key={step.label}
+                                                        className="flex items-center gap-1"
+                                                    >
+                                                        <div
+                                                            className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium whitespace-nowrap ${step.done
+                                                                ? "bg-primary/10 text-primary"
+                                                                : step.active
+                                                                    ? "bg-muted text-foreground"
+                                                                    : "text-muted-foreground"
+                                                                }`}
+                                                        >
+                                                            {step.done &&
+                                                                !step.active ? (
+                                                                <CheckCircle className="w-2.5 h-2.5" />
+                                                            ) : step.active ? (
+                                                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                                            ) : (
+                                                                <Clock className="w-2.5 h-2.5" />
+                                                            )}
+                                                            {step.label}
+                                                        </div>
+                                                        {i < 2 && (
+                                                            <div className="w-2 h-px bg-border" />
                                                         )}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                                    </div>
+                                                )
+                                            )}
                                         </div>
-                                    </div>
-                                )}
-
-                                {/* Download Button */}
-                                {processedImage && (
-                                    <div className="mt-6">
-                                        <Button
-                                            variant="default"
-                                            onClick={() => handleExport("jpg")}
-                                            className="w-full cursor-pointer"
-                                        >
-                                            <Download className="h-4 w-4 mr-2" />
-                                            Download
-                                        </Button>
+                                    </motion.div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                                        <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mb-3">
+                                            <Sparkles className="w-5 h-5 text-muted-foreground" />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Upload an image and pick a tool
+                                            <br />
+                                            to start editing
+                                        </p>
                                     </div>
                                 )}
                             </div>
-                        </motion.div>
+
+                            {/* Divider */}
+                            <div className="h-px bg-border" />
+
+                            {/* Edit History */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Clock className="w-4 h-4 text-muted-foreground" />
+                                    <h4 className="text-sm font-semibold text-foreground">
+                                        History
+                                    </h4>
+                                    {editHistory.length > 0 && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="text-[10px] px-1.5 py-0"
+                                        >
+                                            {editHistory.length}
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                {editHistory.length > 0 ? (
+                                    <div className="space-y-2">
+                                        <AnimatePresence mode="popLayout">
+                                            {editHistory.map((job, idx) => (
+                                                <motion.div
+                                                    key={job.id}
+                                                    initial={{
+                                                        opacity: 0,
+                                                        y: -8,
+                                                        scale: 0.95,
+                                                    }}
+                                                    animate={{
+                                                        opacity: 1,
+                                                        y: 0,
+                                                        scale: 1,
+                                                    }}
+                                                    exit={{
+                                                        opacity: 0,
+                                                        scale: 0.95,
+                                                    }}
+                                                    transition={{
+                                                        type: "spring",
+                                                        stiffness: 400,
+                                                        damping: 25,
+                                                    }}
+                                                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors cursor-default"
+                                                >
+                                                    <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />
+                                                    <span className="text-xs text-foreground truncate flex-1">
+                                                        {allTools.find(
+                                                            (t) =>
+                                                                t.id ===
+                                                                job.type
+                                                        )?.name ||
+                                                            job.type.replace(
+                                                                "-",
+                                                                " "
+                                                            )}
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground shrink-0">
+                                                        #{idx + 1}
+                                                    </span>
+                                                </motion.div>
+                                            ))}
+                                        </AnimatePresence>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground text-center py-4">
+                                        No edits yet
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Download Section */}
+                            <AnimatePresence>
+                                {processedImage && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        transition={{
+                                            type: "spring",
+                                            stiffness: 300,
+                                            damping: 25,
+                                        }}
+                                    >
+                                        <div className="h-px bg-border mb-6" />
+                                        <div className="space-y-2">
+                                            <Button
+                                                variant="default"
+                                                onClick={() =>
+                                                    handleExport("png")
+                                                }
+                                                className="w-full gap-2 cursor-pointer"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                Download PNG
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() =>
+                                                    handleExport("jpg")
+                                                }
+                                                className="w-full gap-2 cursor-pointer"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                Download JPG
+                                            </Button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </motion.aside>
                     </div>
                 </div>
             </section>
