@@ -13,7 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import { useScroll } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useRouter, usePathname } from "next/navigation";
@@ -140,7 +140,7 @@ export default function Navbar() {
                                     <Button
                                         variant="default"
                                         className="cursor-pointer px-4 shrink-0"
-                                        onClick={() => signIn("google")}
+                                        onClick={() => router.push("/signin")}
                                     >
                                         Sign In
                                     </Button>
@@ -284,7 +284,7 @@ export default function Navbar() {
                                             variant="default"
                                             className="w-full"
                                             onClick={() => {
-                                                signIn("google");
+                                                router.push("/signin");
                                                 setMenuState(false);
                                             }}
                                         >
