@@ -237,4 +237,72 @@
     .transition-bounce {
         transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     }
+
+    .editor-panel {
+        background: oklch(0.97 0 0 / 0.85);
+        backdrop-filter: blur(24px);
+        border: 1px solid oklch(0 0 0 / 0.08);
+        border-radius: 1rem;
+    }
+    .dark .editor-panel {
+        background: oklch(0.16 0 0 / 0.7);
+        border-color: oklch(1 0 0 / 0.08);
+    }
+
+    .shimmer {
+        background: linear-gradient(
+            90deg,
+            oklch(1 0 0 / 0) 0%,
+            oklch(1 0 0 / 0.08) 50%,
+            oklch(1 0 0 / 0) 100%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.8s ease-in-out infinite;
+    }
+
+    .tool-card {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tool-card:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px oklch(0 0 0 / 0.12);
+    }
+    .tool-card:active:not(:disabled) {
+        transform: translateY(0) scale(0.98);
+    }
+
+    .canvas-checkerboard {
+        background-image:
+            linear-gradient(45deg, oklch(0.5 0 0 / 0.05) 25%, transparent 25%),
+            linear-gradient(-45deg, oklch(0.5 0 0 / 0.05) 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, oklch(0.5 0 0 / 0.05) 75%),
+            linear-gradient(-45deg, transparent 75%, oklch(0.5 0 0 / 0.05) 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: oklch(0.5 0 0 / 0.3) transparent;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+        width: 4px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: oklch(0.5 0 0 / 0.3);
+        border-radius: 4px;
+    }
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-ring {
+    0% { transform: scale(0.8); opacity: 1; }
+    100% { transform: scale(2.4); opacity: 0; }
 }
