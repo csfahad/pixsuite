@@ -58,13 +58,15 @@ export default function Footer() {
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center justify-center space-x-4 mt-2 text-sm text-muted-foreground relative z-10">
+                        <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 mt-2 text-sm text-muted-foreground relative z-10">
                             <p className="text-sm text-muted-foreground text-center relative z-10">
                                 © {new Date().getFullYear()} PixSuite. All rights reserved.
                             </p>
-                            <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
-                            <span>•</span>
-                            <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+                            <div className="flex items-center space-x-4">
+                                <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
+                                <span>•</span>
+                                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+                            </div>
                         </div>
                     </div>
                 </motion.div>
