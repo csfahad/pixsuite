@@ -10,7 +10,7 @@ export default function TermsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="container mx-auto px-4 max-w-4xl py-12"
+                className="w-full px-6 lg:px-16 py-12"
             >
                 <h1 className="text-4xl font-bold mb-8 text-foreground">Terms of Service</h1>
 
