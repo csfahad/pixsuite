@@ -84,25 +84,28 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // transfer: use the higher of the two usage counts
-        const newUsageCount = Math.max(user.usageCount, anonSession.usageCount);
+        // transfer: use the higher of the two upload counts
+        const newUploadCount = Math.max(user.uploadCount, anonSession.usageCount);
 
         await prisma.users.update({
             where: { id: user.id },
-            data: { usageCount: newUsageCount },
+            data: {
+                uploadCount: newUploadCount,
+                usageCount: newUploadCount,
+            },
         });
 
         await prisma.anonymous_sessions.update({
             where: { id: anonSession.id },
             data: {
-                usageCount: newUsageCount,
+                usageCount: newUploadCount,
                 ipAddress: clientIp ?? anonSession.ipAddress,
             },
         });
 
         const response = NextResponse.json({
             transferred: true,
-            usageCount: newUsageCount,
+            uploadCount: newUploadCount,
         });
 
         return response;
@@ -114,4 +117,3 @@ export async function POST(request: NextRequest) {
         );
     }
 }
-
