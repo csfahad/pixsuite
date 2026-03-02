@@ -48,10 +48,9 @@ async function getOrCreateSession() {
         });
 
         if (exhaustedSession) {
-            // re-attach: give them back their exhausted session & re-set cookie
             return {
                 session: exhaustedSession,
-                isNew: true, // triggers cookie re-set
+                isNew: true,
                 newSessionId: exhaustedSession.sessionId,
             };
         }
@@ -93,9 +92,12 @@ export async function GET() {
         const { session, isNew, newSessionId } = await getOrCreateSession();
 
         const response = NextResponse.json({
-            usageCount: session.usageCount,
-            usageLimit: session.usageLimit,
+            uploadCount: session.usageCount,
+            uploadLimit: session.usageLimit,
             canUpload: session.usageCount < session.usageLimit,
+            creditsUsed: 0,
+            creditLimit: 0,
+            creditsRemaining: 0,
             plan: "Free",
         });
 
@@ -116,10 +118,13 @@ export async function POST() {
         if (session.usageCount >= session.usageLimit) {
             const response = NextResponse.json(
                 {
-                    error: "Free usage limit reached",
-                    usageCount: session.usageCount,
-                    usageLimit: session.usageLimit,
+                    error: "Free upload limit reached",
+                    uploadCount: session.usageCount,
+                    uploadLimit: session.usageLimit,
                     canUpload: false,
+                    creditsUsed: 0,
+                    creditLimit: 0,
+                    creditsRemaining: 0,
                     plan: "Free",
                 },
                 { status: 403 }
@@ -133,9 +138,12 @@ export async function POST() {
         });
 
         const response = NextResponse.json({
-            usageCount: updated.usageCount,
-            usageLimit: updated.usageLimit,
+            uploadCount: updated.usageCount,
+            uploadLimit: updated.usageLimit,
             canUpload: updated.usageCount < updated.usageLimit,
+            creditsUsed: 0,
+            creditLimit: 0,
+            creditsRemaining: 0,
             plan: "Free",
         });
 
