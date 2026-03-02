@@ -3,7 +3,7 @@ import Razorpay from "razorpay";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUpgradedUsage } from "@/lib/plans";
+import { getUpgradedUsage, type PlanType } from "@/lib/plans";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
@@ -57,30 +57,29 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // get plan and upgrade context from order notes (captured at order creation)
+        // get plan from order notes
         const order = await razorpay.orders.fetch(razorpay_order_id);
-        const planType = (order.notes?.plan || "Lite") as "Lite" | "Pro";
-        const fromPlan = (order.notes?.fromPlan || "Free") as "Free" | "Lite" | "Pro";
-        const usageCount = parseInt(String(order.notes?.usageCount || "0"), 10) || 0;
+        const planType = (order.notes?.plan || "Starter") as "Starter" | "Lite" | "Pro";
 
-        // compute usage: Free→paid resets to 0; Lite→Pro adds remaining quota
-        const { usageCount: newUsageCount, usageLimit } = getUpgradedUsage(
-            fromPlan,
-            planType,
-            usageCount
-        );
+        // compute new credits and upload limits
+        const { creditsUsed, creditLimit, uploadCount, uploadLimit } =
+            getUpgradedUsage(user.plan as PlanType, planType);
 
         // calculate expiration date (1 month from now)
         const subscriptionExpiresAt = new Date();
         subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1);
 
-        // update user plan, usage (reset on upgrade), and expiration
+        // update user plan, credits, uploads, and expiration
         await prisma.users.update({
             where: { id: user.id },
             data: {
-                plan: planType === "Lite" ? "Lite" : "Pro",
-                usageLimit,
-                usageCount: newUsageCount,
+                plan: planType,
+                creditsUsed,
+                creditLimit,
+                uploadCount,
+                uploadLimit,
+                usageCount: uploadCount,
+                usageLimit: uploadLimit,
                 razorpayCustomerId: razorpay_payment_id,
                 subscriptionExpiresAt: subscriptionExpiresAt,
             },
@@ -95,7 +94,7 @@ export async function POST(request: NextRequest) {
             await prisma.subscriptions.update({
                 where: { id: existingSubscription.id },
                 data: {
-                    plan: planType === "Lite" ? "Lite" : "Pro",
+                    plan: planType,
                     razorpaySubscriptionId: razorpay_order_id,
                     razorpayCustomerId: razorpay_payment_id,
                     expiresAt: subscriptionExpiresAt,
@@ -106,7 +105,7 @@ export async function POST(request: NextRequest) {
             await prisma.subscriptions.create({
                 data: {
                     userId: user.id,
-                    plan: planType === "Lite" ? "Lite" : "Pro",
+                    plan: planType,
                     razorpaySubscriptionId: razorpay_order_id,
                     razorpayCustomerId: razorpay_payment_id,
                     expiresAt: subscriptionExpiresAt,

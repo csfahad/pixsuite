@@ -2,7 +2,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUpgradedUsage } from "@/lib/plans";
+import { getUpgradedUsage, PLAN_UPLOAD_LIMITS, type PlanType } from "@/lib/plans";
 
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET!;
 
@@ -45,13 +45,11 @@ export async function POST(request: NextRequest) {
             const orderId = payment.order_id;
             const paymentId = payment.id;
 
-            // get order details from razorpay notes (already stored userId there)
             try {
                 const order = await razorpay.orders.fetch(orderId);
                 const userId = order.notes?.userId;
-                const planType = (order.notes?.plan || "Lite") as "Lite" | "Pro";
-                const fromPlan = (order.notes?.fromPlan || "Free") as "Free" | "Lite" | "Pro";
-                const usageCount = parseInt(String(order.notes?.usageCount || "0"), 10) || 0;
+                const planType = (order.notes?.plan || "Starter") as "Starter" | "Lite" | "Pro";
+                const fromPlan = (order.notes?.fromPlan || "Free") as PlanType;
 
                 if (!userId) {
                     console.error("User ID not found in order notes");
@@ -75,24 +73,25 @@ export async function POST(request: NextRequest) {
                     );
                 }
 
-                // compute usage: Free→paid resets to 0; Lite→Pro adds remaining quota
-                const { usageCount: newUsageCount, usageLimit } = getUpgradedUsage(
-                    fromPlan,
-                    planType,
-                    usageCount
-                );
+                // compute new credits and upload limits
+                const { creditsUsed, creditLimit, uploadCount, uploadLimit } =
+                    getUpgradedUsage(fromPlan, planType);
 
                 // calculate expiration date (1 month from now)
                 const subscriptionExpiresAt = new Date();
                 subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1);
 
-                // update user plan, usage (reset on upgrade), and expiration
+                // update user plan, credits, uploads, and expiration
                 await prisma.users.update({
                     where: { id: user.id },
                     data: {
-                        plan: planType === "Lite" ? "Lite" : "Pro",
-                        usageLimit,
-                        usageCount: newUsageCount,
+                        plan: planType,
+                        creditsUsed,
+                        creditLimit,
+                        uploadCount,
+                        uploadLimit,
+                        usageCount: uploadCount,
+                        usageLimit: uploadLimit,
                         razorpayCustomerId: paymentId,
                         subscriptionExpiresAt: subscriptionExpiresAt,
                     },
@@ -107,7 +106,7 @@ export async function POST(request: NextRequest) {
                     await prisma.subscriptions.update({
                         where: { id: existingSubscription.id },
                         data: {
-                            plan: planType === "Lite" ? "Lite" : "Pro",
+                            plan: planType,
                             razorpaySubscriptionId: orderId,
                             razorpayCustomerId: paymentId,
                             expiresAt: subscriptionExpiresAt,
@@ -118,7 +117,7 @@ export async function POST(request: NextRequest) {
                     await prisma.subscriptions.create({
                         data: {
                             userId: user.id,
-                            plan: planType === "Lite" ? "Lite" : "Pro",
+                            plan: planType,
                             razorpaySubscriptionId: orderId,
                             razorpayCustomerId: paymentId,
                             expiresAt: subscriptionExpiresAt,
@@ -151,7 +150,6 @@ export async function POST(request: NextRequest) {
                 const orderId = paymentEntity.order_id;
                 const paymentId = paymentEntity.id;
 
-                // attempt to find the associated subscription and user
                 const subscription = await prisma.subscriptions.findFirst({
                     where: { razorpaySubscriptionId: orderId },
                 });
@@ -175,7 +173,11 @@ export async function POST(request: NextRequest) {
                         where: { id: user.id },
                         data: {
                             plan: "Free",
-                            usageLimit: 3,
+                            creditLimit: 0,
+                            creditsUsed: 0,
+                            uploadLimit: PLAN_UPLOAD_LIMITS.Free,
+                            uploadCount: 0,
+                            usageLimit: PLAN_UPLOAD_LIMITS.Free,
                         },
                     });
 
