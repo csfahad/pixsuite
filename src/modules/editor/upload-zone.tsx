@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "motion/react";
-import { Crown, ImageIcon, Loader2, Upload, X } from "lucide-react";
+import { Crown, ImageIcon, Loader2, Upload, X, Zap } from "lucide-react";
 import {
     ImageKitInvalidRequestError,
     ImageKitServerError,
@@ -12,29 +12,37 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PaymentModal from "@/components/modals/payment-modal";
+import type { PlanType } from "@/lib/plans";
 
 interface UploadZoneProps {
     onImageUpload: (imageUrl: string) => void;
+    updatedCreditsRemaining?: number;
 }
 
-export default function UploadZone({ onImageUpload }: UploadZoneProps) {
+interface UsageData {
+    creditsUsed: number;
+    creditLimit: number;
+    creditsRemaining: number;
+    uploadCount: number;
+    uploadLimit: number;
+    plan: string;
+    canUpload: boolean;
+    subscriptionExpiresAt?: string | null;
+}
+
+export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: UploadZoneProps) {
     const { data: session } = useSession();
     const isAuthenticated = !!session?.user;
     const hasTransferred = useRef(false);
     const searchParams = useSearchParams();
     const router = useRouter();
-    const [selectedPlan, setSelectedPlan] = useState<"Lite" | "Pro">("Lite");
+    const [selectedPlan, setSelectedPlan] = useState<"Starter" | "Lite" | "Pro">("Starter");
 
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [usageData, setUsageData] = useState<{
-        usageCount: number;
-        usageLimit: number;
-        plan: string;
-        canUpload: boolean;
-    } | null>(null);
+    const [usageData, setUsageData] = useState<UsageData | null>(null);
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -62,7 +70,7 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                     setUsageData(data);
                     const currentPlan = data?.plan || "Free";
                     if (currentPlan === "Free") {
-                        setSelectedPlan(upgradePlan as "Lite" | "Pro");
+                        setSelectedPlan(upgradePlan as "Starter" | "Lite" | "Pro");
                         setShowPaymentModal(true);
                     }
                 })
@@ -222,7 +230,7 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
             if (response.status === 403) {
                 setUsageData(errorData);
                 setShowPaymentModal(true);
-                throw new Error("Usage limit reached");
+                throw new Error("Upload limit reached");
             }
             throw new Error("Failed to update usage");
         }
@@ -245,8 +253,8 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
         onImageUpload("");
     };
 
-    const usagePercent = usageData
-        ? (usageData.usageCount / usageData.usageLimit) * 100
+    const uploadPercent = usageData
+        ? (usageData.uploadCount / usageData.uploadLimit) * 100
         : 0;
 
     return (
@@ -415,10 +423,12 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                     transition={{ delay: 0.2 }}
                     className="mt-3 space-y-2"
                 >
+                    {/* Upload count */}
                     <div className="flex items-center justify-between text-[10px]">
                         <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Upload className="h-2.5 w-2.5" />
                             <span>
-                                {usageData.usageCount}/{usageData.usageLimit}
+                                {usageData.uploadCount}/{usageData.uploadLimit} uploads
                             </span>
                             {usageData.plan !== "Free" && (
                                 <Badge
@@ -436,15 +446,28 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                             </div>
                         )}
                     </div>
-                    {/* Mini progress bar */}
+                    {/* Upload progress bar */}
                     <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
                         <motion.div
                             className="h-full bg-primary rounded-full"
                             initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(usagePercent, 100)}%` }}
+                            animate={{ width: `${Math.min(uploadPercent, 100)}%` }}
                             transition={{ duration: 0.6, ease: "easeOut" }}
                         />
                     </div>
+
+                    {/* Credit balance (for paid users) */}
+                    {usageData.creditLimit > 0 && (
+                        <div className="flex items-center justify-between text-[10px]">
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Zap className="h-2.5 w-2.5 text-primary" />
+                                <span>
+                                    {(updatedCreditsRemaining ?? usageData.creditsRemaining)?.toLocaleString()}/{usageData.creditLimit?.toLocaleString()} credits
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
                     <p className="text-[10px] text-muted-foreground text-center">
                         JPG, PNG, WEBP up to 10MB
                     </p>
@@ -461,10 +484,12 @@ export default function UploadZone({ onImageUpload }: UploadZoneProps) {
                         checkUsage().catch(console.error);
                     }
                 }}
-                usageCount={usageData?.usageCount || 0}
-                usageLimit={usageData?.usageLimit || 3}
+                creditsRemaining={updatedCreditsRemaining ?? usageData?.creditsRemaining ?? 0}
+                creditLimit={usageData?.creditLimit ?? 0}
+                uploadCount={usageData?.uploadCount ?? 0}
+                uploadLimit={usageData?.uploadLimit ?? 3}
                 plan={selectedPlan}
-                currentPlan={(usageData?.plan as "Free" | "Lite" | "Pro") || "Free"}
+                currentPlan={(usageData?.plan as PlanType) || "Free"}
                 isAuthenticated={isAuthenticated}
             />
         </motion.div>
