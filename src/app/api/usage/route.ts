@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { PLAN_UPLOAD_LIMITS } from "@/lib/plans";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -18,8 +19,10 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 plan: true,
-                usageCount: true,
-                usageLimit: true,
+                creditsUsed: true,
+                creditLimit: true,
+                uploadCount: true,
+                uploadLimit: true,
                 subscriptionExpiresAt: true,
             },
         });
@@ -32,34 +35,49 @@ export async function GET(request: NextRequest) {
         }
 
         // check if subscription has expired
-        const isSubscriptionActive = user.subscriptionExpiresAt 
+        const isSubscriptionActive = user.subscriptionExpiresAt
             ? new Date(user.subscriptionExpiresAt) > new Date()
             : false;
 
         // if subscription expired, reset to Free plan
-        if ((user.plan === "Lite" || user.plan === "Pro") && !isSubscriptionActive) {
+        if (
+            (user.plan === "Starter" || user.plan === "Lite" || user.plan === "Pro") &&
+            !isSubscriptionActive
+        ) {
             await prisma.users.update({
                 where: { id: user.id },
                 data: {
                     plan: "Free",
-                    usageLimit: 3,
+                    creditLimit: 0,
+                    creditsUsed: 0,
+                    uploadLimit: PLAN_UPLOAD_LIMITS.Free,
+                    uploadCount: 0,
+                    usageLimit: PLAN_UPLOAD_LIMITS.Free,
                     subscriptionExpiresAt: null,
                 },
             });
             return NextResponse.json({
-                usageCount: user.usageCount,
-                usageLimit: 3,
+                creditsUsed: 0,
+                creditLimit: 0,
+                creditsRemaining: 0,
+                uploadCount: 0,
+                uploadLimit: PLAN_UPLOAD_LIMITS.Free,
                 plan: "Free",
-                canUpload: user.usageCount < 3,
+                canUpload: true,
                 subscriptionExpiresAt: null,
             });
         }
 
+        const creditsRemaining = Math.max(0, user.creditLimit - user.creditsUsed);
+
         return NextResponse.json({
-            usageCount: user.usageCount,
-            usageLimit: user.usageLimit,
+            creditsUsed: user.creditsUsed,
+            creditLimit: user.creditLimit,
+            creditsRemaining,
+            uploadCount: user.uploadCount,
+            uploadLimit: user.uploadLimit,
             plan: user.plan,
-            canUpload: user.usageCount < user.usageLimit,
+            canUpload: user.uploadCount < user.uploadLimit,
             subscriptionExpiresAt: user.subscriptionExpiresAt?.toISOString() || null,
         });
     } catch (err) {
@@ -83,8 +101,10 @@ export async function POST(request: NextRequest) {
         select: {
             id: true,
             plan: true,
-            usageCount: true,
-            usageLimit: true,
+            creditsUsed: true,
+            creditLimit: true,
+            uploadCount: true,
+            uploadLimit: true,
         },
     });
 
@@ -93,12 +113,15 @@ export async function POST(request: NextRequest) {
     }
 
     // check if user can upload
-    if (user.usageCount >= user.usageLimit) {
+    if (user.uploadCount >= user.uploadLimit) {
         return NextResponse.json(
             {
-                error: "Usage limit reached",
-                usageCount: user.usageCount,
-                usageLimit: user.usageLimit,
+                error: "Upload limit reached",
+                creditsUsed: user.creditsUsed,
+                creditLimit: user.creditLimit,
+                creditsRemaining: Math.max(0, user.creditLimit - user.creditsUsed),
+                uploadCount: user.uploadCount,
+                uploadLimit: user.uploadLimit,
                 plan: user.plan,
                 canUpload: false,
             },
@@ -106,23 +129,29 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // increment usage count
+    // increment upload count
     const updatedUser = await prisma.users.update({
         where: { id: user.id },
         data: {
-            usageCount: user?.usageCount + 1,
+            uploadCount: user.uploadCount + 1,
+            usageCount: user.uploadCount + 1,
         },
         select: {
-            usageCount: true,
-            usageLimit: true,
+            creditsUsed: true,
+            creditLimit: true,
+            uploadCount: true,
+            uploadLimit: true,
             plan: true,
         },
     });
 
     return NextResponse.json({
-        usageCount: updatedUser.usageCount,
-        usageLimit: updatedUser.usageLimit,
+        creditsUsed: updatedUser.creditsUsed,
+        creditLimit: updatedUser.creditLimit,
+        creditsRemaining: Math.max(0, updatedUser.creditLimit - updatedUser.creditsUsed),
+        uploadCount: updatedUser.uploadCount,
+        uploadLimit: updatedUser.uploadLimit,
         plan: updatedUser.plan,
-        canUpload: updatedUser.usageCount < updatedUser.usageLimit,
+        canUpload: updatedUser.uploadCount < updatedUser.uploadLimit,
     });
 }
