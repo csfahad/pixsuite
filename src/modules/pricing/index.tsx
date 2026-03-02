@@ -2,58 +2,75 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
-import { Check, Crown, Star, Zap } from "lucide-react";
+import { Check, Crown, Rocket, Star, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { GlowingEffect } from "@/components/ui/glowing-effect";
 import PaymentModal from "@/components/modals/payment-modal";
-import { getUpgradePriceDisplayUSD } from "@/lib/plans";
+import { getUpgradePriceDisplayUSD, type PlanType } from "@/lib/plans";
 
 const plans = [
     {
-        name: "Free",
+        name: "Free" as PlanType,
         price: "$0",
         period: "forever",
-        description: "Perfect for trying out PixSuite",
+        description: "Try out PixSuite basics",
         features: [
-            "3 edits on free plan",
-            "Basic AI background removal",
-            "Standard resolution output",
+            "3 uploads",
+            "Smart crop & face crop (free)",
+            "Basic transforms (resize, format, compress)",
             "Community support",
         ],
-        limitations: ["Limited usage"],
+        limitations: ["No AI credits", "Limited uploads"],
         cta: "Start Free",
         popular: false,
         icon: Star,
     },
     {
-        name: "Lite",
+        name: "Starter" as PlanType,
         price: "$9",
         period: "per month",
-        description: "For growing creators with higher needs",
+        description: "For casual creators getting started",
         features: [
-            "1000 edits(uploads)/month",
-            "All AI features unlocked",
-            "High resolution output",
-            "Up to 20 GB bandwidth/month",
+            "3,000 AI Credits/month",
+            "500 uploads/month",
+            "All basic AI features",
+            "Unlimited basic transforms",
             "Email support",
         ],
-        cta: "Go Lite",
-        popular: true,
+        limitations: ["No Pro BG removal (e-removedotbg)"],
+        cta: "Go Starter",
+        popular: false,
         icon: Zap,
     },
     {
-        name: "Pro",
+        name: "Lite" as PlanType,
         price: "$29",
         period: "per month",
-        description: "Unlimited power for professionals",
+        description: "For growing creators with higher needs",
         features: [
-            "Unlimited edits",
+            "10,000 AI Credits/month",
+            "5,000 uploads/month",
             "All AI features unlocked",
-            "Up to 4K resolution",
-            "Up to 100 GB bandwidth/month",
-            "Priority support",
+            "Priority processing",
+            "Pro BG removal included",
+        ],
+        cta: "Go Lite",
+        popular: true,
+        icon: Rocket,
+    },
+    {
+        name: "Pro" as PlanType,
+        price: "$59",
+        period: "per month",
+        description: "Maximum power for professionals",
+        features: [
+            "25,000 AI Credits/month",
+            "20,000 uploads/month",
+            "All AI features unlocked",
+            "Fastest processing",
             "API access",
+            "Priority support",
             "Early access to new features",
         ],
         cta: "Go Pro",
@@ -68,10 +85,13 @@ export default function Pricing() {
     const { data: session } = useSession();
     const isAuthenticated = !!session?.user;
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<"Lite" | "Pro">("Lite");
+    const [selectedPlan, setSelectedPlan] = useState<"Starter" | "Lite" | "Pro">("Starter");
     const [usageData, setUsageData] = useState<{
-        usageCount: number;
-        usageLimit: number;
+        creditsUsed: number;
+        creditLimit: number;
+        creditsRemaining: number;
+        uploadCount: number;
+        uploadLimit: number;
         plan: string;
         canUpload: boolean;
         subscriptionExpiresAt?: string | null;
@@ -123,17 +143,11 @@ export default function Pricing() {
         }
 
         // prevent downgrades
-        if (currentPlan === "Pro" && planName === "Lite") {
-            return;
-        }
-        if (
-            (currentPlan === "Pro" || currentPlan === "Lite") &&
-            planName === "Free"
-        ) {
+        if (!canUpgradeToPlan(planName)) {
             return;
         }
 
-        setSelectedPlan(planName as "Lite" | "Pro");
+        setSelectedPlan(planName as "Starter" | "Lite" | "Pro");
         setShowPaymentModal(true);
     };
 
@@ -143,7 +157,7 @@ export default function Pricing() {
         const isSubscriptionActive = usageData.subscriptionExpiresAt
             ? new Date(usageData.subscriptionExpiresAt) > new Date()
             : false;
-        return currentPlan === planName && isSubscriptionActive;
+        return currentPlan === planName && (planName === "Free" || isSubscriptionActive);
     };
 
     const canUpgradeToPlan = (planName: string) => {
@@ -157,13 +171,11 @@ export default function Pricing() {
             return false;
         }
 
-        // prevent downgrades
-        if (currentPlan === "Pro" && planName === "Lite") return false;
-        if (
-            (currentPlan === "Pro" || currentPlan === "Lite") &&
-            planName === "Free"
-        )
+        // plan hierarchy
+        const planRank: Record<string, number> = { Free: 0, Starter: 1, Lite: 2, Pro: 3 };
+        if ((planRank[currentPlan] || 0) >= (planRank[planName] || 0) && isSubscriptionActive) {
             return false;
+        }
 
         return true;
     };
@@ -173,18 +185,35 @@ export default function Pricing() {
         checkUsage().catch(console.error);
     };
 
-    const getProPlanPrice = () => {
-        const currentPlan = (usageData?.plan as "Free" | "Lite" | "Pro") || "Free";
-        if (currentPlan === "Lite") {
-            return `$${getUpgradePriceDisplayUSD("Lite", "Pro")}`;
+    const getDisplayPrice = (plan: typeof plans[0]) => {
+        if (plan.name === "Free") return plan.price;
+
+        const currentPlan = (usageData?.plan as PlanType) || "Free";
+        const isSubscriptionActive = usageData?.subscriptionExpiresAt
+            ? new Date(usageData.subscriptionExpiresAt) > new Date()
+            : false;
+
+        // show pro-rata price if upgrading from a paid plan
+        if (isSubscriptionActive && currentPlan !== "Free" && currentPlan !== plan.name) {
+            const planRank: Record<string, number> = { Free: 0, Starter: 1, Lite: 2, Pro: 3 };
+            if ((planRank[plan.name] || 0) > (planRank[currentPlan] || 0)) {
+                return `$${getUpgradePriceDisplayUSD(currentPlan, plan.name as "Starter" | "Lite" | "Pro")}`;
+            }
         }
-        return "$29";
+
+        return plan.price;
     };
 
-    // check if Pro plan should show pro-rata pricing
-    const isProPlanProRata = () => {
-        const currentPlan = (usageData?.plan as "Free" | "Lite" | "Pro") || "Free";
-        return currentPlan === "Lite";
+    const isProRata = (planName: string) => {
+        const currentPlan = (usageData?.plan as PlanType) || "Free";
+        const isSubscriptionActive = usageData?.subscriptionExpiresAt
+            ? new Date(usageData.subscriptionExpiresAt) > new Date()
+            : false;
+
+        if (!isSubscriptionActive || currentPlan === "Free") return false;
+
+        const planRank: Record<string, number> = { Free: 0, Starter: 1, Lite: 2, Pro: 3 };
+        return (planRank[planName] || 0) > (planRank[currentPlan] || 0);
     };
 
     return (
@@ -193,7 +222,7 @@ export default function Pricing() {
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
 
-            <div className="container mx-auto max-w-6xl px-4 relative z-10">
+            <div className="w-full px-6 sm:px-10 lg:px-16 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -203,29 +232,29 @@ export default function Pricing() {
                 >
                     <div className="inline-flex items-center space-x-2 bg-gradient-glass rounded-xl px-6 py-3 mb-6 glass border border-card">
                         <Zap className="h-5 w-5 text-primary" />
-                        <span className="font-medium">Simple Pricing</span>
+                        <span className="font-medium">Credit-Based Pricing</span>
                     </div>
 
                     <h2 className="text-4xl lg:text-6xl font-bold mb-6">
-                        <span className="text-foreground">Choose Your </span>
+                        <span className="text-foreground">Pay for What </span>
                         <span className="bg-primary bg-clip-text! text-transparent">
-                            Magic Plan
+                            You Use
                         </span>
                     </h2>
                     <p className="text-base md:text-xl text-muted-foreground max-w-3xl mx-auto">
-                        Start free, upgrade when you need more. No hidden fees,
-                        cancel anytime.
+                        Each AI feature has a credit cost. Light users pay less,
+                        power users get more. No surprises.
                     </p>
                 </motion.div>
 
-                <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                <div className="grid lg:grid-cols-4 gap-6">
                     {plans?.map((plan, index) => (
                         <motion.div
                             key={plan.name}
                             initial={{ opacity: 0, y: 50 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            transition={{ duration: 0.8, delay: index * 0.2 }}
+                            transition={{ duration: 0.8, delay: index * 0.15 }}
                             whileHover={{ scale: 1.02, y: -5 }}
                             className={`relative group rounded-xl ${plan.popular ? "lg:-mt-8" : ""
                                 }`}
@@ -251,7 +280,7 @@ export default function Pricing() {
                             {plan.proPopular && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
                                     <div className="bg-primary/80 px-6 py-2 rounded-lg text-sm font-bold text-background">
-                                        Popular
+                                        Best Value
                                     </div>
                                 </div>
                             )}
@@ -283,17 +312,15 @@ export default function Pricing() {
 
                                     <div className="mb-6">
                                         <span className="text-5xl font-bold text-foreground">
-                                            {plan.name === "Pro" && isProPlanProRata()
-                                                ? getProPlanPrice()
-                                                : plan.price}
+                                            {getDisplayPrice(plan)}
                                         </span>
                                         <span className="text-muted-foreground ml-2">
                                             /{plan.period}
                                         </span>
-                                        {plan.name === "Pro" && isProPlanProRata() && (
+                                        {isProRata(plan.name) && (
                                             <div className="mt-2">
                                                 <span className="text-xs text-primary font-medium">
-                                                    Pro-rata upgrade from Lite
+                                                    Pro-rata upgrade
                                                 </span>
                                             </div>
                                         )}
@@ -301,9 +328,9 @@ export default function Pricing() {
                                 </div>
 
                                 <div className="space-y-4 mb-16">
-                                    {plan?.features?.map((feature) => (
+                                    {plan?.features?.map((feature, fi) => (
                                         <div
-                                            key={index}
+                                            key={fi}
                                             className={
                                                 "flex items-center space-x-3"
                                             }
@@ -368,8 +395,8 @@ export default function Pricing() {
                     className="text-center mt-12"
                 >
                     <p className="text-muted-foreground">
-                        All plans include access to our core AI features.
-                        Upgrade anytime for more power.
+                        Each AI tool costs credits. Free tools (crop, resize) always remain free.
+                        Upgrade anytime for more credits.
                     </p>
                 </motion.div>
             </div>
@@ -382,10 +409,12 @@ export default function Pricing() {
                     handlePaymentModalClose();
                     checkUsage().catch(console.error);
                 }}
-                usageCount={usageData?.usageCount || 0}
-                usageLimit={usageData?.usageLimit || 3}
+                creditsRemaining={usageData?.creditsRemaining ?? 0}
+                creditLimit={usageData?.creditLimit ?? 0}
+                uploadCount={usageData?.uploadCount ?? 0}
+                uploadLimit={usageData?.uploadLimit ?? 3}
                 plan={selectedPlan}
-                currentPlan={(usageData?.plan as "Free" | "Lite" | "Pro") || "Free"}
+                currentPlan={(usageData?.plan as PlanType) || "Free"}
                 isAuthenticated={isAuthenticated}
             />
         </section>
