@@ -8,15 +8,11 @@ const common = async ({
     name,
     avatar,
     plan,
-    usageCount,
-    usageLimit,
 }: {
     email: string;
     name: string;
     avatar: string;
     plan: Plan;
-    usageCount: number;
-    usageLimit: number;
 }) => {
     try {
         const user = await prisma.users.findUnique({
@@ -31,8 +27,12 @@ const common = async ({
                     name,
                     avatar,
                     plan,
-                    usageCount,
-                    usageLimit,
+                    usageCount: 0,
+                    usageLimit: 3,
+                    creditsUsed: 0,
+                    creditLimit: 0,
+                    uploadCount: 0,
+                    uploadLimit: 3,
                 },
             });
             return user;
@@ -55,11 +55,9 @@ export const authOptions: NextAuthOptions = {
                     name: profile.name!,
                     avatar: profile.picture!,
                     plan: "Free",
-                    usageCount: 0,
-                    usageLimit: 3,
                 });
                 return {
-                    id: profile.sub, // use 'sub' as the ID from Google OAuth
+                    id: profile.sub,
                     email: profile.email,
                     name: profile.name,
                     image: profile.picture,
@@ -72,14 +70,11 @@ export const authOptions: NextAuthOptions = {
         strategy: "jwt",
     },
     callbacks: {
-        // JWT callback to add custom fields to the token
         async jwt({ token, user }: { token: any; user: any }) {
             if (user) {
                 token.email = user.email;
                 token.avatar = user.image;
                 token.plan = "Free";
-                token.usageCount = 0;
-                token.usageLimit = 3;
             }
             return token;
         },
@@ -87,8 +82,6 @@ export const authOptions: NextAuthOptions = {
             session.user.email = token.email;
             session.user.avatar = token.avatar;
             session.user.plan = token.plan;
-            session.user.usageCount = token.usageCount;
-            session.user.usageLimit = token.usageLimit;
             return session;
         },
     },
