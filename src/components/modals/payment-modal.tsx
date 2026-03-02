@@ -2,9 +2,14 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, Crown, LogIn, Star, X, Zap } from "lucide-react";
+import { Check, Crown, LogIn, Rocket, Star, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getUpgradePriceDisplay } from "@/lib/plans";
+import {
+    getUpgradePriceDisplay,
+    PLAN_CREDIT_LIMITS,
+    PLAN_UPLOAD_LIMITS,
+    type PlanType,
+} from "@/lib/plans";
 
 declare global {
     interface Window {
@@ -16,20 +21,50 @@ interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
     onUpgrade: () => void;
-    usageCount: number;
-    usageLimit: number;
-    plan?: "Lite" | "Pro";
-    currentPlan?: "Free" | "Lite" | "Pro";
+    creditsRemaining: number;
+    creditLimit: number;
+    uploadCount: number;
+    uploadLimit: number;
+    plan?: "Starter" | "Lite" | "Pro";
+    currentPlan?: PlanType;
     isAuthenticated?: boolean;
 }
+
+const planIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+    Starter: Zap,
+    Lite: Rocket,
+    Pro: Crown,
+};
+
+const planFeatures: Record<string, { title: string; description: string }[]> = {
+    Starter: [
+        { title: `${PLAN_CREDIT_LIMITS.Starter.toLocaleString()} AI Credits/mo`, description: "Use any AI tool — pay per feature" },
+        { title: `${PLAN_UPLOAD_LIMITS.Starter.toLocaleString()} Uploads/mo`, description: "More than enough for casual use" },
+        { title: "All Basic AI Features", description: "Background removal, upscale, retouch, and more" },
+    ],
+    Lite: [
+        { title: `${PLAN_CREDIT_LIMITS.Lite.toLocaleString()} AI Credits/mo`, description: "Enough for frequent editing" },
+        { title: `${PLAN_UPLOAD_LIMITS.Lite.toLocaleString()} Uploads/mo`, description: "Handle high-volume workloads" },
+        { title: "All AI Features Unlocked", description: "Including Pro BG removal (e-removedotbg)" },
+        { title: "Priority Processing", description: "Faster AI processing for your edits" },
+    ],
+    Pro: [
+        { title: `${PLAN_CREDIT_LIMITS.Pro.toLocaleString()} AI Credits/mo`, description: "Maximum credits for power users" },
+        { title: `${PLAN_UPLOAD_LIMITS.Pro.toLocaleString()} Uploads/mo`, description: "Handle enterprise volumes" },
+        { title: "Fastest Processing", description: "Top priority in processing queue" },
+        { title: "API Access + Priority Support", description: "For professional workflows" },
+    ],
+};
 
 export default function PaymentModal({
     isOpen,
     onClose,
     onUpgrade,
-    usageCount,
-    usageLimit,
-    plan = "Lite",
+    creditsRemaining,
+    creditLimit,
+    uploadCount,
+    uploadLimit,
+    plan = "Starter",
     currentPlan = "Free",
     isAuthenticated = true,
 }: PaymentModalProps) {
@@ -152,6 +187,9 @@ export default function PaymentModal({
         }
     };
 
+    const PlanIcon = planIcons[plan] || Zap;
+    const features = planFeatures[plan] || [];
+
     if (!mounted) return null;
 
     return createPortal(
@@ -182,109 +220,35 @@ export default function PaymentModal({
                         {/* Header */}
                         <div className="text-center mb-6">
                             <div className="w-16 h-16 mx-auto mb-4 bg-primary rounded-full flex items-center justify-center">
-                                {plan === "Pro" ? (
-                                    <Crown className="h-8 w-8 text-primary-foreground" />
-                                ) : (
-                                    <Zap className="h-8 w-8 text-primary-foreground" />
-                                )}
+                                <PlanIcon className="h-8 w-8 text-primary-foreground" />
                             </div>
                             <h2 className="text-2xl font-bold text-foreground mb-2">
                                 Upgrade to {plan}
                             </h2>
-                            <p className="text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                                 {currentPlan === "Free"
-                                    ? `You've used ${usageCount}/${usageLimit} free uploads`
-                                    : `You've used ${usageCount}/${usageLimit} of your ${currentPlan} plan`}
+                                    ? `You've used ${uploadCount}/${uploadLimit} free uploads`
+                                    : `${creditsRemaining.toLocaleString()} credits remaining on ${currentPlan}`}
                             </p>
                         </div>
 
                         {/* Features */}
                         <div className="space-y-4 mb-6">
-                            {plan === "Pro" ? (
-                                <>
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                            <Check className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground">
-                                                Unlimited Uploads
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                No more usage limits
-                                            </p>
-                                        </div>
+                            {features.map((feature, i) => (
+                                <div key={i} className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center shrink-0">
+                                        <Check className="h-4 w-4 text-primary" />
                                     </div>
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                            <Zap className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground">
-                                                Priority Processing
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                Faster AI processing
-                                            </p>
-                                        </div>
+                                    <div>
+                                        <p className="font-medium text-foreground text-sm">
+                                            {feature.title}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {feature.description}
+                                        </p>
                                     </div>
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                            <Star className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground">
-                                                Premium Effects
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                Access to advanced AI tools
-                                            </p>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                            <Check className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground">
-                                                1000 Uploads/Month
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                More than enough for most users
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                            <Zap className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground">
-                                                All AI Features
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                Unlock all AI tools
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                            <Star className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-foreground">
-                                                High Resolution
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                High quality output
-                                            </p>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                                </div>
+                            ))}
                         </div>
 
                         {/* Pricing */}
@@ -301,13 +265,11 @@ export default function PaymentModal({
                                         /month
                                     </span>
                                 </div>
-                                <p className="text-sm text-muted-foreground">
-                                    {currentPlan === "Lite" && plan === "Pro" && (
-                                        <span className="block text-primary font-medium">
-                                            (Pro-rata upgrade)
-                                        </span>
-                                    )}
-                                </p>
+                                {currentPlan !== "Free" && (
+                                    <span className="text-xs text-primary font-medium">
+                                        (Pro-rata upgrade from {currentPlan})
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -326,11 +288,7 @@ export default function PaymentModal({
                                         </>
                                     ) : (
                                         <>
-                                            {plan === "Pro" ? (
-                                                <Crown className="h-4 w-4 mr-2" />
-                                            ) : (
-                                                <Zap className="h-4 w-4 mr-2" />
-                                            )}
+                                            <PlanIcon className="h-4 w-4 mr-2" />
                                             Start {plan} Plan
                                         </>
                                     )}
