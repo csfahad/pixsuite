@@ -43,9 +43,11 @@ type UserData = {
     name: string;
     email: string;
     avatar: string | null;
-    plan: "Free" | "Lite" | "Pro";
-    usageCount: number;
-    usageLimit: number;
+    plan: "Free" | "Starter" | "Lite" | "Pro";
+    creditsUsed: number;
+    creditLimit: number;
+    uploadCount: number;
+    uploadLimit: number;
     subscriptionExpiresAt: string | null;
     createdAt: string;
     updatedAt: string;
@@ -58,16 +60,35 @@ const tabs: { id: Tab; label: string; icon: typeof User }[] = [
     { id: "plan", label: "Plan & Billing", icon: CreditCard },
 ];
 
-const planConfig = {
+const planConfig: Record<string, {
+    icon: typeof Star;
+    color: string;
+    bg: string;
+    border: string;
+    label: string;
+    description: string;
+    price: string;
+    period: string;
+}> = {
     Free: {
         icon: Star,
         color: "text-muted-foreground",
         bg: "bg-muted",
         border: "border-border",
         label: "Free Plan",
-        description: "Basic access with limited edits",
-        price: "$0",
+        description: "3 uploads/month, no AI credits",
+        price: "₹0",
         period: "/forever",
+    },
+    Starter: {
+        icon: Zap,
+        color: "text-emerald-500",
+        bg: "bg-emerald-500/10",
+        border: "border-emerald-500/30",
+        label: "Starter Plan",
+        description: "500 uploads/mo, 3,000 AI credits",
+        price: "₹999",
+        period: "/month",
     },
     Lite: {
         icon: Zap,
@@ -75,8 +96,8 @@ const planConfig = {
         bg: "bg-blue-500/10",
         border: "border-blue-500/30",
         label: "Lite Plan",
-        description: "1,000 edits/month with all AI features",
-        price: "$9",
+        description: "5,000 uploads/mo, 10,000 AI credits",
+        price: "₹2,699",
         period: "/month",
     },
     Pro: {
@@ -85,8 +106,8 @@ const planConfig = {
         bg: "bg-amber-500/10",
         border: "border-amber-500/30",
         label: "Pro Plan",
-        description: "Unlimited edits with priority support",
-        price: "$29",
+        description: "20,000 uploads/mo, 25,000 AI credits",
+        price: "₹5,499",
         period: "/month",
     },
 };
@@ -229,12 +250,20 @@ function AccountPageContent() {
         return `${Math.floor(diffDays / 365)} years ago`;
     };
 
-    const usagePercentage = userData
-        ? Math.min((userData.usageCount / userData.usageLimit) * 100, 100)
+    const creditPercentage = userData && userData.creditLimit > 0
+        ? Math.min((userData.creditsUsed / userData.creditLimit) * 100, 100)
+        : 0;
+
+    const uploadPercentage = userData
+        ? Math.min((userData.uploadCount / userData.uploadLimit) * 100, 100)
         : 0;
 
     const creditsRemaining = userData
-        ? Math.max(userData.usageLimit - userData.usageCount, 0)
+        ? Math.max(userData.creditLimit - userData.creditsUsed, 0)
+        : 0;
+
+    const uploadsRemaining = userData
+        ? Math.max(userData.uploadLimit - userData.uploadCount, 0)
         : 0;
 
     const isSubscriptionActive = userData?.subscriptionExpiresAt
@@ -258,7 +287,7 @@ function AccountPageContent() {
         <TooltipProvider>
             <div className="min-h-screen bg-background pt-28 pb-12">
                 {/* Page header */}
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
+                <div className="w-full px-6 lg:px-16 mb-8">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -273,7 +302,7 @@ function AccountPageContent() {
                     </motion.div>
                 </div>
 
-                <div className="max-w-5xl mx-auto px-4 sm:px-6">
+                <div className="w-full px-6 lg:px-16">
                     <div className="flex flex-col md:flex-row gap-8">
                         {/* Sidebar */}
                         <motion.aside
@@ -367,8 +396,10 @@ function AccountPageContent() {
                                     <PlanTab
                                         key="plan"
                                         userData={userData}
-                                        usagePercentage={usagePercentage}
+                                        creditPercentage={creditPercentage}
+                                        uploadPercentage={uploadPercentage}
                                         creditsRemaining={creditsRemaining}
+                                        uploadsRemaining={uploadsRemaining}
                                         isSubscriptionActive={isSubscriptionActive}
                                         formatDate={formatDate}
                                     />
@@ -642,14 +673,18 @@ function AccountTab({
 
 function PlanTab({
     userData,
-    usagePercentage,
+    creditPercentage,
+    uploadPercentage,
     creditsRemaining,
+    uploadsRemaining,
     isSubscriptionActive,
     formatDate,
 }: {
     userData: UserData | null;
-    usagePercentage: number;
+    creditPercentage: number;
+    uploadPercentage: number;
     creditsRemaining: number;
+    uploadsRemaining: number;
     isSubscriptionActive: boolean;
     formatDate: (d: string) => string;
 }) {
@@ -673,7 +708,9 @@ function PlanTab({
                         ? "bg-linear-to-r from-amber-500 to-orange-500"
                         : userData.plan === "Lite"
                             ? "bg-linear-to-r from-blue-500 to-cyan-500"
-                            : "bg-linear-to-r from-muted-foreground/30 to-muted-foreground/10"
+                            : userData.plan === "Starter"
+                                ? "bg-linear-to-r from-emerald-500 to-teal-500"
+                                : "bg-linear-to-r from-muted-foreground/30 to-muted-foreground/10"
                         }`}
                 />
                 <CardContent className="p-6">
@@ -788,10 +825,10 @@ function PlanTab({
                 </CardContent>
             </Card>
 
-            {/* Credits usage */}
+            {/* AI Credits usage */}
             <div>
                 <h3 className="text-lg font-semibold text-foreground mb-4">
-                    Credit Usage
+                    AI Credits
                 </h3>
                 <Card className="border-border/50">
                     <CardContent className="p-6 space-y-5">
@@ -801,24 +838,24 @@ function PlanTab({
                                     Credits Used
                                 </p>
                                 <p className="text-2xl font-bold text-foreground">
-                                    {userData.usageCount.toLocaleString()}
+                                    {userData.creditsUsed.toLocaleString()}
                                     <span className="text-base font-normal text-muted-foreground">
                                         {" "}
-                                        / {userData.usageLimit.toLocaleString()}
+                                        / {userData.creditLimit.toLocaleString()}
                                     </span>
                                 </p>
                             </div>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div
-                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${usagePercentage >= 90
+                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${creditPercentage >= 90
                                             ? "bg-destructive/10 text-destructive"
-                                            : usagePercentage >= 70
+                                            : creditPercentage >= 70
                                                 ? "bg-amber-500/10 text-amber-500"
                                                 : "bg-emerald-500/10 text-emerald-500"
                                             }`}
                                     >
-                                        {Math.round(usagePercentage)}%
+                                        {Math.round(creditPercentage)}%
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -835,7 +872,7 @@ function PlanTab({
                                 style={{ transformOrigin: "left" }}
                             >
                                 <Progress
-                                    value={usagePercentage}
+                                    value={creditPercentage}
                                     className="h-2.5"
                                 />
                             </motion.div>
@@ -844,7 +881,71 @@ function PlanTab({
                                     {creditsRemaining.toLocaleString()} remaining
                                 </span>
                                 <span>
-                                    {userData.usageLimit.toLocaleString()} total
+                                    {userData.creditLimit.toLocaleString()} total
+                                </span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Upload usage */}
+            <div>
+                <h3 className="text-lg font-semibold text-foreground mb-4">
+                    Uploads
+                </h3>
+                <Card className="border-border/50">
+                    <CardContent className="p-6 space-y-5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-muted-foreground">
+                                    Uploads This Month
+                                </p>
+                                <p className="text-2xl font-bold text-foreground">
+                                    {userData.uploadCount.toLocaleString()}
+                                    <span className="text-base font-normal text-muted-foreground">
+                                        {" "}
+                                        / {userData.uploadLimit.toLocaleString()}
+                                    </span>
+                                </p>
+                            </div>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div
+                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${uploadPercentage >= 90
+                                            ? "bg-destructive/10 text-destructive"
+                                            : uploadPercentage >= 70
+                                                ? "bg-amber-500/10 text-amber-500"
+                                                : "bg-emerald-500/10 text-emerald-500"
+                                            }`}
+                                    >
+                                        {Math.round(uploadPercentage)}%
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {uploadsRemaining.toLocaleString()} uploads remaining
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+
+                        <div className="space-y-2">
+                            <motion.div
+                                initial={{ scaleX: 0 }}
+                                animate={{ scaleX: 1 }}
+                                transition={{ duration: 0.8, ease: "easeOut" }}
+                                style={{ transformOrigin: "left" }}
+                            >
+                                <Progress
+                                    value={uploadPercentage}
+                                    className="h-2.5"
+                                />
+                            </motion.div>
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>
+                                    {uploadsRemaining.toLocaleString()} remaining
+                                </span>
+                                <span>
+                                    {userData.uploadLimit.toLocaleString()} total
                                 </span>
                             </div>
                         </div>
@@ -860,24 +961,24 @@ function PlanTab({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
                         {
-                            label: "Total Edits",
-                            value: userData.usageCount.toLocaleString(),
-                            icon: Sparkles,
-                            color: "text-primary",
-                            bg: "bg-primary/10",
-                        },
-                        {
                             label: "Credits Left",
                             value: creditsRemaining.toLocaleString(),
                             icon: Zap,
                             color:
-                                creditsRemaining < 5
+                                creditsRemaining < 100
                                     ? "text-destructive"
                                     : "text-emerald-500",
                             bg:
-                                creditsRemaining < 5
+                                creditsRemaining < 100
                                     ? "bg-destructive/10"
                                     : "bg-emerald-500/10",
+                        },
+                        {
+                            label: "Uploads Left",
+                            value: uploadsRemaining.toLocaleString(),
+                            icon: Sparkles,
+                            color: "text-primary",
+                            bg: "bg-primary/10",
                         },
                         {
                             label: "Plan Tier",
@@ -935,8 +1036,8 @@ function PlanTab({
                                     <div>
                                         <h4 className="font-semibold text-foreground">
                                             {userData.plan === "Free"
-                                                ? "Unlock more with Lite or Pro"
-                                                : "Upgrade to Pro for unlimited edits"}
+                                                ? "Unlock AI features with a plan"
+                                                : "Upgrade for more credits and uploads"}
                                         </h4>
                                         <p className="text-sm text-muted-foreground">
                                             Get access to all features and higher
