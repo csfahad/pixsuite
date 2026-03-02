@@ -15,6 +15,7 @@ enum Role {
 
 enum Plan {
     Free
+    Starter
     Lite
     Pro
 }
@@ -29,6 +30,10 @@ model users {
     role                  Role      @default(User)
     usageCount            Int       @default(0)
     usageLimit            Int       @default(3)
+    creditsUsed           Int       @default(0)
+    creditLimit           Int       @default(0)
+    uploadCount           Int       @default(0)
+    uploadLimit           Int       @default(3)
     subscriptionExpiresAt DateTime?
     createdAt             DateTime  @default(now())
     updatedAt             DateTime  @updatedAt
