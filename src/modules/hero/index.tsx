@@ -34,6 +34,7 @@ export default function Hero() {
 
     const currentPlan = usageData?.plan || "Free";
     const isFreePlan = currentPlan === "Free";
+    const isStarterPlan = currentPlan === "Starter";
     const isLitePlan = currentPlan === "Lite";
     const isProPlan = currentPlan === "Pro";
     const isFreeAndLimitReached = isFreePlan && usageData && !usageData.canUpload;
@@ -61,7 +62,7 @@ export default function Hero() {
                     style={{ animationDelay: "-1s" }}
                 />
 
-                <div className="container mx-auto max-w-6xl px-4 grid gap-12 items-center justify-center relative z-10">
+                <div className="w-full px-6 lg:px-16 grid gap-12 items-center justify-center relative z-10">
                     {/* Left Content */}
                     <motion.div
                         initial={{ opacity: 0, x: -50 }}
@@ -161,6 +162,30 @@ export default function Hero() {
                                 </>
                             )}
 
+                            {isStarterPlan && (
+                                <>
+                                    <Button
+                                        variant="secondary"
+                                        size="lg"
+                                        onClick={() => scrollToSection("pricing")}
+                                        className="group cursor-pointer"
+                                    >
+                                        Upgrade Plan
+                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                    </Button>
+                                    <Link href="/editor">
+                                        <Button
+                                            variant="default"
+                                            size="lg"
+                                            className="group text-background cursor-pointer w-full"
+                                        >
+                                            <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
+                                            Start Editing
+                                        </Button>
+                                    </Link>
+                                </>
+                            )}
+
                             {isLitePlan && (
                                 <>
                                     <Button
@@ -203,19 +228,25 @@ export default function Hero() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.6 }}
-                            className="mt-8 grid grid-cols-1 md:grid-cols-3 items-start justify-items-start md:justify-items-center gap-2 md:gap-0 md:space-x-6 text-sm text-muted-foreground w-fit md:w-auto mx-auto"
+                            className="mt-8 flex justify-center"
                         >
-                            <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-chart-1 rounded-full animate-pulse" />
-                                <span>Perfect to explore on Free</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-chart-2 rounded-full animate-pulse" />
-                                <span>Generous limits on Lite</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                                <span>Infinite possibilities on Pro</span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-3 text-sm text-muted-foreground">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-chart-1 rounded-full animate-pulse shrink-0" />
+                                    <span>Explore free, no card needed</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-chart-2 rounded-full animate-pulse shrink-0" />
+                                    <span>Starter — perfect kickoff</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: "#8b5cf6" }} />
+                                    <span>Lite — power without limits</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse shrink-0" />
+                                    <span>Pro — unlimited creativity</span>
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>
