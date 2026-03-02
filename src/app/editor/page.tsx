@@ -9,6 +9,7 @@ import {
     Expand,
     Layers,
     Loader2,
+    Lock,
     Scissors,
     Sparkles,
     Type,
@@ -16,7 +17,8 @@ import {
     X,
     Zap,
 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "motion/react";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ import {
 import UploadZone from "../../modules/editor/upload-zone";
 import CanvasEditor from "../../modules/editor/canvas-editor";
 import Footer from "@/components/footer";
+import { CREDIT_COSTS, FEATURE_MIN_PLAN, type PlanType } from "@/lib/plans";
 
 type JobStatus = "idle" | "queued" | "processing" | "completed" | "error";
 
@@ -48,6 +51,8 @@ interface ToolItem {
     icon: React.ComponentType<{ className?: string }>;
     description: string;
     hasPrompt?: boolean;
+    credits: number;
+    minPlan?: PlanType;
 }
 
 interface ToolCategory {
@@ -66,12 +71,15 @@ const toolCategories: ToolCategory[] = [
                 name: "Remove Background",
                 icon: Scissors,
                 description: "Remove background with AI",
+                credits: CREDIT_COSTS["e-bgremove"],
             },
             {
                 id: "e-removedotbg",
                 name: "Remove BG (Pro)",
                 icon: Scissors,
                 description: "High-quality background removal",
+                credits: CREDIT_COSTS["e-removedotbg"],
+                minPlan: FEATURE_MIN_PLAN["e-removedotbg"] as PlanType,
             },
             {
                 id: "e-changebg",
@@ -79,6 +87,7 @@ const toolCategories: ToolCategory[] = [
                 icon: Expand,
                 description: "Replace background with AI",
                 hasPrompt: true,
+                credits: CREDIT_COSTS["e-changebg"],
             },
             {
                 id: "e-edit",
@@ -86,6 +95,7 @@ const toolCategories: ToolCategory[] = [
                 icon: Type,
                 description: "Edit image with text prompts",
                 hasPrompt: true,
+                credits: CREDIT_COSTS["e-edit"],
             },
             {
                 id: "bg-genfill",
@@ -93,6 +103,7 @@ const toolCategories: ToolCategory[] = [
                 icon: Expand,
                 description: "Fill empty areas with AI",
                 hasPrompt: true,
+                credits: CREDIT_COSTS["bg-genfill"],
             },
         ],
     },
@@ -105,18 +116,21 @@ const toolCategories: ToolCategory[] = [
                 name: "AI Drop Shadow",
                 icon: Zap,
                 description: "Add realistic shadows",
+                credits: CREDIT_COSTS["e-dropshadow"],
             },
             {
                 id: "e-retouch",
                 name: "AI Retouch",
                 icon: Zap,
                 description: "Enhance and retouch image",
+                credits: CREDIT_COSTS["e-retouch"],
             },
             {
                 id: "e-upscale",
                 name: "AI Upscale 2x",
                 icon: Zap,
                 description: "Upscale image quality",
+                credits: CREDIT_COSTS["e-upscale"],
             },
             {
                 id: "e-genvar",
@@ -124,6 +138,7 @@ const toolCategories: ToolCategory[] = [
                 icon: Type,
                 description: "Create image variations",
                 hasPrompt: true,
+                credits: CREDIT_COSTS["e-genvar"],
             },
         ],
     },
@@ -136,12 +151,14 @@ const toolCategories: ToolCategory[] = [
                 name: "Face Crop",
                 icon: Crop,
                 description: "Smart face-focused cropping",
+                credits: CREDIT_COSTS["e-crop-face"],
             },
             {
                 id: "e-crop-smart",
                 name: "Smart Crop",
                 icon: Crop,
                 description: "AI-powered intelligent cropping",
+                credits: CREDIT_COSTS["e-crop-smart"],
             },
         ],
     },
@@ -150,6 +167,9 @@ const toolCategories: ToolCategory[] = [
 const allTools = toolCategories.flatMap((cat) => cat.tools);
 
 export default function Editor() {
+    const { data: session } = useSession();
+    const isAuthenticated = !!session?.user;
+
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
     const [processedImage, setProcessedImage] = useState<string | null>(null);
     const [currentJob, setCurrentJob] = useState<ProcessingJob | null>(null);
@@ -161,6 +181,35 @@ export default function Editor() {
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
         new Set()
     );
+    const [userPlan, setUserPlan] = useState<PlanType>("Free");
+    const [creditsRemaining, setCreditsRemaining] = useState<number>(0);
+    const [creditError, setCreditError] = useState<string | null>(null);
+
+    // fetch user plan and credits
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetch("/api/usage")
+                .then((res) => res.json())
+                .then((data) => {
+                    setUserPlan((data.plan || "Free") as PlanType);
+                    setCreditsRemaining(data.creditsRemaining ?? 0);
+                })
+                .catch(console.error);
+        }
+    }, [isAuthenticated]);
+
+    const refreshCredits = async () => {
+        try {
+            const res = await fetch("/api/usage");
+            if (res.ok) {
+                const data = await res.json();
+                setUserPlan((data.plan || "Free") as PlanType);
+                setCreditsRemaining(data.creditsRemaining ?? 0);
+            }
+        } catch (e) {
+            console.error("Failed to refresh credits:", e);
+        }
+    };
 
     const handleImageUpload = (imageUrl: string) => {
         setUploadedImage(imageUrl);
@@ -202,11 +251,71 @@ export default function Editor() {
         return transforms[toolId] || "";
     };
 
+    const isToolLocked = (tool: ToolItem): boolean => {
+        if (!tool.minPlan) return false;
+        const planRank: Record<string, number> = { Free: 0, Starter: 1, Lite: 2, Pro: 3 };
+        return (planRank[userPlan] || 0) < (planRank[tool.minPlan] || 0);
+    };
+
+    const getCreditBadge = (credits: number) => {
+        if (credits === 0) return "FREE";
+        return `${credits} credits`;
+    };
+
+    const deductCredits = async (featureId: string): Promise<boolean> => {
+        const creditCost = CREDIT_COSTS[featureId];
+
+        if (creditCost === 0) return true;
+
+        if (!isAuthenticated) {
+            setCreditError("Sign in and upgrade to use AI features");
+            setTimeout(() => setCreditError(null), 3000);
+            return false;
+        }
+
+        try {
+            const res = await fetch("/api/deduct-credits", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ featureId }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                if (data.requiredPlan) {
+                    setCreditError(`Requires ${data.requiredPlan} plan or higher`);
+                } else if (data.creditsRemaining !== undefined) {
+                    setCreditError(`Not enough credits (need ${creditCost}, have ${data.creditsRemaining})`);
+                } else {
+                    setCreditError(data.error || "Failed to deduct credits");
+                }
+                setTimeout(() => setCreditError(null), 4000);
+                return false;
+            }
+
+            setCreditsRemaining(data.creditsRemaining ?? 0);
+            return true;
+        } catch (err) {
+            console.error("Credit deduction error:", err);
+            setCreditError("Failed to validate credits");
+            setTimeout(() => setCreditError(null), 3000);
+            return false;
+        }
+    };
+
     const handleToolClick = async (toolId: string) => {
         if (!uploadedImage) return;
 
         const tool = allTools.find((t) => t.id === toolId);
         if (!tool) return;
+
+        // check if tool is locked by plan
+        if (isToolLocked(tool)) {
+            setCreditError(`This feature requires ${tool.minPlan || "Lite"} plan or higher`);
+            setTimeout(() => setCreditError(null), 3000);
+            return;
+        }
 
         // toggle effect on/off
         const newActiveEffects = new Set(activeEffects);
@@ -239,6 +348,10 @@ export default function Editor() {
 
     const applyEffect = async (toolId: string, prompt?: string) => {
         if (!uploadedImage) return;
+
+        // deduct credits before applying
+        const allowed = await deductCredits(toolId);
+        if (!allowed) return;
 
         const newJob: ProcessingJob = {
             id: Date.now().toString(),
@@ -299,6 +412,8 @@ export default function Editor() {
                             completedJob,
                             ...prev.slice(0, 4),
                         ]);
+
+                        await refreshCredits();
                         return true;
                     }
                 } catch (err) {
@@ -394,7 +509,19 @@ export default function Editor() {
                     <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
                 </div>
 
-                <div className="container mx-auto max-w-6xl px-4 relative z-10">
+                {/* Credit error toast */}
+                {creditError && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground px-6 py-3 rounded-lg shadow-lg text-sm font-medium"
+                    >
+                        {creditError}
+                    </motion.div>
+                )}
+
+                <div className="w-full px-4 sm:px-8 lg:px-12 relative z-10">
 
                     {/* Active Effects & Export Bar */}
                     <motion.div
@@ -404,6 +531,15 @@ export default function Editor() {
                         className="flex items-center justify-between mb-6"
                     >
                         <div className="flex items-center gap-3 flex-wrap">
+                            {/* Credit balance indicator */}
+                            {isAuthenticated && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                                    <Zap className="w-3.5 h-3.5 text-primary" />
+                                    <span className="text-xs font-semibold text-primary">
+                                        {creditsRemaining.toLocaleString()} credits
+                                    </span>
+                                </div>
+                            )}
 
                             {/* Active effects badges */}
                             <AnimatePresence mode="popLayout">
@@ -444,6 +580,7 @@ export default function Editor() {
                                             >
                                                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                                                 {tool?.name}
+                                                <span className="text-[9px] opacity-70">-{tool?.credits || 0}cr</span>
                                                 <X className="w-3 h-3 opacity-60" />
                                             </Badge>
                                         </motion.div>
@@ -467,6 +604,7 @@ export default function Editor() {
                                 <Suspense fallback={null}>
                                     <UploadZone
                                         onImageUpload={handleImageUpload}
+                                        updatedCreditsRemaining={creditsRemaining}
                                     />
                                 </Suspense>
                             </div>
@@ -567,13 +705,14 @@ export default function Editor() {
                                                             transition={{ duration: 0.2 }}
                                                             className="overflow-hidden"
                                                         >
-                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                                                 {category.tools.map((tool, toolIdx) => {
                                                                     const isActive = activeEffects.has(tool.id);
                                                                     const isToolProcessing =
                                                                         currentJob?.type === tool.id &&
                                                                         currentJob.status === "processing";
                                                                     const isDisabled = !uploadedImage || isProcessing;
+                                                                    const locked = isToolLocked(tool);
 
                                                                     return (
                                                                         <Tooltip key={tool.id}>
@@ -583,46 +722,58 @@ export default function Editor() {
                                                                                     animate={{ opacity: 1, y: 0 }}
                                                                                     transition={{ duration: 0.2, delay: toolIdx * 0.04 }}
                                                                                     onClick={() => handleToolClick(tool.id)}
-                                                                                    disabled={isDisabled}
-                                                                                    className={`tool-card flex items-center gap-2.5 px-3 py-3 rounded-xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border transition-all group ${isActive
-                                                                                        ? "bg-primary text-primary-foreground border-primary shadow-lg"
-                                                                                        : "border-border hover:border-primary/30 hover:bg-muted/40"
+                                                                                    disabled={isDisabled || locked}
+                                                                                    className={`tool-card flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border transition-all group ${isActive
+                                                                                        ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
+                                                                                        : locked
+                                                                                            ? "border-border/50 opacity-50"
+                                                                                            : "border-border hover:border-primary/40 hover:bg-muted/50"
                                                                                         }`}
                                                                                 >
+                                                                                    {/* Icon */}
                                                                                     <div
                                                                                         className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isActive
                                                                                             ? "bg-primary-foreground/20"
-                                                                                            : "bg-muted group-hover:bg-primary/10"
+                                                                                            : locked
+                                                                                                ? "bg-muted/50"
+                                                                                                : "bg-muted group-hover:bg-primary/10"
                                                                                             }`}
                                                                                     >
                                                                                         {isToolProcessing ? (
-                                                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                                        ) : locked ? (
+                                                                                            <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                                                                                         ) : (
-                                                                                            <tool.icon className="w-4 h-4" />
+                                                                                            <tool.icon className="w-3.5 h-3.5" />
                                                                                         )}
                                                                                     </div>
-                                                                                    <div className="flex-1 min-w-0">
-                                                                                        <div className="text-sm font-medium truncate">
-                                                                                            {tool.name}
-                                                                                        </div>
-                                                                                        {tool.hasPrompt && (
-                                                                                            <div className={`text-[10px] ${isActive ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                                                                                                Prompt required
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    {isActive && !isToolProcessing && (
-                                                                                        <motion.div
-                                                                                            initial={{ scale: 0 }}
-                                                                                            animate={{ scale: 1 }}
-                                                                                            className="w-2 h-2 rounded-full bg-primary-foreground shrink-0"
-                                                                                        />
+
+                                                                                    {/* Name */}
+                                                                                    <span className="text-[13px] font-medium whitespace-nowrap">
+                                                                                        {tool.name}
+                                                                                    </span>
+
+                                                                                    {/* Credit badge — pushed to far right */}
+                                                                                    <span className={`ml-auto shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-medium ${tool.credits === 0
+                                                                                        ? "bg-emerald-500/15 text-emerald-400"
+                                                                                        : isActive
+                                                                                            ? "bg-primary-foreground/15 text-primary-foreground"
+                                                                                            : "bg-muted text-muted-foreground"
+                                                                                        }`}>
+                                                                                        {getCreditBadge(tool.credits)}
+                                                                                    </span>
+
+                                                                                    {/* Locked label */}
+                                                                                    {locked && (
+                                                                                        <span className="text-[9px] text-destructive font-medium shrink-0">
+                                                                                            {tool.minPlan}+
+                                                                                        </span>
                                                                                     )}
                                                                                 </motion.button>
                                                                             </TooltipTrigger>
-                                                                            <TooltipContent side="bottom" className="max-w-[200px]">
-                                                                                <p className="font-medium">{tool.name}</p>
-                                                                                <p className="text-xs opacity-80 mt-0.5">{tool.description}</p>
+                                                                            <TooltipContent side="bottom" className="max-w-[220px] py-1.5 px-2.5">
+                                                                                <p className="font-medium text-[13px]">{tool.name}</p>
+                                                                                <p className="text-xs opacity-80">{tool.description}</p>
                                                                             </TooltipContent>
                                                                         </Tooltip>
                                                                     );
@@ -847,8 +998,8 @@ export default function Editor() {
                                                                 " "
                                                             )}
                                                     </span>
-                                                    <span className="text-[10px] text-muted-foreground shrink-0">
-                                                        #{idx + 1}
+                                                    <span className="text-[10px] text-primary shrink-0">
+                                                        -{CREDIT_COSTS[job.type] || 0} cr
                                                     </span>
                                                 </motion.div>
                                             ))}
