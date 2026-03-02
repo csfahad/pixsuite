@@ -2,7 +2,7 @@ import Razorpay from "razorpay";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUpgradeAmount } from "@/lib/plans";
+import { getUpgradeAmount, isUpgrade, type PlanType } from "@/lib/plans";
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
@@ -33,14 +33,24 @@ export async function POST(request: NextRequest) {
 
         // get plan from request body
         const body = await request.json().catch(() => ({}));
-        const planType = body.plan || "Lite";
-        
+        const planType = (body.plan || "Starter") as "Starter" | "Lite" | "Pro";
+
+        // validate plan type
+        if (!["Starter", "Lite", "Pro"].includes(planType)) {
+            return NextResponse.json(
+                { error: "Invalid plan type" },
+                { status: 400 }
+            );
+        }
+
+        const fromPlan = user.plan as PlanType;
+
         // check if user already has an active subscription for this plan
-        const isSubscriptionActive = user.subscriptionExpiresAt 
+        const isSubscriptionActive = user.subscriptionExpiresAt
             ? new Date(user.subscriptionExpiresAt) > new Date()
             : false;
 
-        if (user.plan === planType && isSubscriptionActive) {
+        if (fromPlan === planType && isSubscriptionActive) {
             return NextResponse.json(
                 { error: `You already have an active ${planType} Plan subscription` },
                 { status: 400 }
@@ -48,25 +58,18 @@ export async function POST(request: NextRequest) {
         }
 
         // prevent downgrades
-        if (user.plan === "Pro" && planType === "Lite") {
+        if (!isUpgrade(fromPlan, planType)) {
             return NextResponse.json(
-                { error: "Pro users cannot downgrade to Lite plan" },
-                { status: 400 }
-            );
-        }
-        if ((user.plan === "Pro" || user.plan === "Lite") && planType === "Free") {
-            return NextResponse.json(
-                { error: "Paid users cannot downgrade to Free plan" },
+                { error: `Cannot downgrade from ${fromPlan} to ${planType}` },
                 { status: 400 }
             );
         }
 
-        const fromPlan = (user.plan as "Free" | "Lite" | "Pro");
         const amount = getUpgradeAmount(fromPlan, planType);
 
         const receipt = `rcpt_${user.id.slice(-10)}_${Date.now().toString().slice(-8)}`;
 
-        // create razorpay order (store fromPlan and usageCount for pro-rata upgrade logic)
+        // create razorpay order
         const options = {
             amount: amount,
             currency: "INR",
@@ -76,7 +79,6 @@ export async function POST(request: NextRequest) {
                 userEmail: user.email,
                 plan: planType,
                 fromPlan: fromPlan,
-                usageCount: String(user.usageCount ?? 0),
             },
         };
 
