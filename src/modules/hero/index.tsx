@@ -62,7 +62,7 @@ export default function Hero() {
                     style={{ animationDelay: "-1s" }}
                 />
 
-                <div className="w-full px-6 lg:px-16 grid gap-12 items-center justify-center relative z-10">
+                <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 grid gap-12 items-center justify-center relative z-10">
                     {/* Left Content */}
                     <motion.div
                         initial={{ opacity: 0, x: -50 }}
@@ -111,7 +111,7 @@ export default function Hero() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.4 }}
-                            className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl"
+                            className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
                         >
                             Enhance photos with smart AI editing. Remove
                             backgrounds, boost quality, or add magic in one

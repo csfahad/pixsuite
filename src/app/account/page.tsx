@@ -287,7 +287,7 @@ function AccountPageContent() {
         <TooltipProvider>
             <div className="min-h-screen bg-background pt-28 pb-12">
                 {/* Page header */}
-                <div className="w-full px-6 lg:px-16 mb-8">
+                <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 mb-8">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -302,7 +302,7 @@ function AccountPageContent() {
                     </motion.div>
                 </div>
 
-                <div className="w-full px-6 lg:px-16">
+                <div className="w-full max-w-7xl mx-auto px-6 lg:px-16">
                     <div className="flex flex-col md:flex-row gap-8">
                         {/* Sidebar */}
                         <motion.aside

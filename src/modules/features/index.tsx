@@ -23,6 +23,7 @@ const UpscaleSimulation = ({ title }: { title: string }) => {
                 whileHover={{ scale: 1.05 }}
                 transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                 className="w-full h-full absolute inset-0 flex bg-neutral-900"
+
             >
                 {/* Left Side: Blurry (Before) */}
                 <div className="w-1/2 h-full relative overflow-hidden z-10">
@@ -266,7 +267,7 @@ export default function Features() {
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
 
-            <div className="container mx-auto max-w-6xl px-4 relative z-10">
+            <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -288,7 +289,7 @@ export default function Features() {
                     </p>
                 </motion.div>
 
-                <BentoGrid className="max-w-4xl mx-auto text-lg ">
+                <BentoGrid className="max-w-6xl mx-auto text-lg ">
                     {features.map((item, i) => (
                         <BentoGridItem
                             key={i}

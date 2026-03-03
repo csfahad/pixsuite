@@ -521,7 +521,7 @@ export default function Editor() {
                     </motion.div>
                 )}
 
-                <div className="w-full px-4 sm:px-8 lg:px-12 relative z-10">
+                <div className="w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 relative z-10">
 
                     {/* Active Effects & Export Bar */}
                     <motion.div
