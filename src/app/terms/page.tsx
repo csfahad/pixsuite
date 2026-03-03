@@ -42,7 +42,7 @@ export default function TermsPage() {
                     <section>
                         <h2 className="text-2xl font-semibold text-foreground mb-4">4. Payment and Refunds</h2>
                         <p>
-                            PixSuite offers paid subscription plans ("Lite" and "Pro"). By subscribing, you agree to pay the fees indicated for
+                            PixSuite offers paid subscription plans ("Starter", "Lite" and "Pro"). By subscribing, you agree to pay the fees indicated for
                             the selected plan. Payments are processed securely via third-party providers. Refund requests are handled on a case-by-case basis.
                         </p>
                     </section>

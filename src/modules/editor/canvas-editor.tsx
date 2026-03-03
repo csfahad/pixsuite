@@ -287,7 +287,7 @@ export default function CanvasEditor({
                             exit={{ opacity: 0, y: -4 }}
                             className="text-xs text-muted-foreground"
                         >
-                            Select a tool from the sidebar to start editing
+                            Select a tool below to start editing
                         </motion.p>
                     )}
                 </AnimatePresence>
