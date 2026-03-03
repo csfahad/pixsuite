@@ -17,7 +17,7 @@ const UpscaleSimulation = ({ title }: { title: string }) => {
     const upscaleImg = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=640&q=80";
 
     return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-24 rounded-xl overflow-hidden">
+        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
             <motion.div
                 initial={{ scale: 1 }}
                 whileHover={{ scale: 1.05 }}
@@ -48,7 +48,7 @@ const WatermarkSimulation = ({ title }: { title: string }) => {
     const watermarkImg = "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=640&q=80";
 
     return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-24 rounded-xl overflow-hidden">
+        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
             <motion.div
                 initial={{ scale: 1 }}
                 whileHover={{ scale: 1.05 }}
@@ -89,7 +89,7 @@ const BgRemovalSimulation = ({ title }: { title: string }) => {
     const bgRemovalImg = "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=640&q=80";
 
     return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-24 rounded-xl overflow-hidden">
+        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
             <motion.div
                 initial={{ scale: 1 }}
                 whileHover={{ scale: 1.05 }}
@@ -121,13 +121,15 @@ const CustomFeatureMedia = ({
     src,
     type,
     title,
+    cropScale,
 }: {
     src: string;
     type: "video" | "image";
     title: string;
+    cropScale?: number;
 }) => {
     return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-24 rounded-xl overflow-hidden">
+        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
             <motion.div
                 initial={{ scale: 1 }}
                 whileHover={{ scale: 1.05 }}
@@ -142,7 +144,8 @@ const CustomFeatureMedia = ({
                             loop
                             muted
                             playsInline
-                            className="w-full h-full object-cover scale-[1.35] lg:scale-[1.4] origin-bottom"
+                            className={`w-full h-full object-cover ${cropScale ? 'origin-[center_60%]' : ''}`}
+                            style={cropScale ? { transform: `scale(${cropScale})` } : undefined}
                         />
                     ) : (
                         <img
@@ -169,10 +172,10 @@ const FeaturesImage = ({ title }: FeaturesImageProps) => {
         return <WatermarkSimulation title={title} />;
     }
     if (title === "AI Generative Fill") {
-        return <CustomFeatureMedia src="/features/gen-fill.webm" type="video" title={title} />;
+        return <CustomFeatureMedia src="/features/gen-fill.webm" type="video" title={title} cropScale={1.5} />;
     }
     if (title === "Smart Crop & Face Focus") {
-        return <CustomFeatureMedia src="/features/smart-crop.webm" type="video" title={title} />;
+        return <CustomFeatureMedia src="/features/smart-crop.webm" type="video" title={title} cropScale={1.6} />;
     }
 
     const imageMap: Record<FeaturesImageProps["title"], string> = {
@@ -263,7 +266,7 @@ const features = [
 
 export default function Features() {
     return (
-        <section id="features" className="py-24 relative overflow-hidden">
+        <section id="features" className="pt-20 pb-10 relative overflow-hidden">
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
 

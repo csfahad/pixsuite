@@ -217,7 +217,7 @@ export default function Pricing() {
     };
 
     return (
-        <section id="pricing" className="py-24 relative overflow-hidden">
+        <section id="pricing" className="pt-20 pb-10 relative overflow-hidden">
             {/* Background effects */}
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
@@ -230,9 +230,9 @@ export default function Pricing() {
                     transition={{ duration: 0.8 }}
                     className="text-center mb-16"
                 >
-                    <div className="inline-flex items-center space-x-2 bg-gradient-glass rounded-xl px-6 py-3 mb-6 glass border border-card">
-                        <Zap className="h-5 w-5 text-primary" />
-                        <span className="font-medium">Credit-Based Pricing</span>
+                    <div className="inline-flex items-center space-x-2 rounded-lg px-4 py-2 mb-6 glass border dark:border-muted-foreground/30">
+                        <Zap className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Credit-Based Pricing</span>
                     </div>
 
                     <h2 className="text-4xl lg:text-6xl font-bold mb-6">
