@@ -196,19 +196,17 @@ export default function Editor() {
                 ? `e-changebg-prompt-${encodeURIComponent(prompt)}`
                 : "e-changebg",
             "e-edit": prompt
-                ? `e-edit:${encodeURIComponent(prompt)}`
+                ? `e-edit-prompt-${encodeURIComponent(prompt)}`
                 : "e-edit",
             "bg-genfill": prompt
-                ? `bg-genfill:${encodeURIComponent(prompt)}`
-                : "bg-genfill",
+                ? `bg-genfill-prompt-${encodeURIComponent(prompt)},w-2000,h-2000,cm-pad_resize`
+                : "bg-genfill,w-2000,h-2000,cm-pad_resize",
             "e-dropshadow": "e-dropshadow",
             "e-retouch": "e-retouch",
             "e-upscale": "e-upscale",
-            "e-genvar": prompt
-                ? `e-genvar:${encodeURIComponent(prompt)}`
-                : "e-genvar",
-            "e-crop-face": "e-crop-face",
-            "e-crop-smart": "e-crop-smart",
+            "e-genvar": "e-genvar",
+            "e-crop-face": "w-200,h-200,fo-face",
+            "e-crop-smart": "w-400,h-400,fo-auto",
         };
 
         return transforms[toolId] || "";
@@ -243,7 +241,7 @@ export default function Editor() {
                 remainingEffects.length > 0
                     ? `${uploadedImage}?tr=${remainingEffects
                         .map((effect) => getImageKitTransform(effect))
-                        .join(",")}`
+                        .join(":")}`
                     : uploadedImage;
             setProcessedImage(newImageUrl);
             return;
@@ -328,60 +326,59 @@ export default function Editor() {
         const transforms = allEffects.map((effect) =>
             getImageKitTransform(effect, effect === toolId ? prompt : undefined)
         );
-        const newImageUrl = `${uploadedImage}?tr=${transforms.join(",")}`;
+        const newImageUrl = `${uploadedImage}?tr=${transforms.join(":")}`;
 
         try {
-            // start polling the AI transformation URL to check when it's complete
             setCurrentJob((prev) =>
                 prev ? { ...prev, status: "processing", progress: 10 } : null
             );
 
             let attempts = 0;
-            const maxAttempts = 60;
-            const pollInterval = 5000;
+            const maxAttempts = 30;
+            const pollInterval = 2000;
+
+            const preloadImage = (url: string): Promise<boolean> => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => resolve(true);
+                    img.onerror = () => resolve(false);
+                    img.src = url + (url.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
+                });
+            };
 
             const pollImageKit = async (): Promise<boolean> => {
                 attempts++;
 
-                try {
-                    const response = await fetch(newImageUrl, {
-                        method: "HEAD",
-                        cache: "no-cache",
-                    });
+                const loaded = await preloadImage(newImageUrl);
 
-                    if (response.ok) {
-                        setProcessedImage(newImageUrl);
-                        setCurrentJob((prev) =>
-                            prev
-                                ? {
-                                    ...prev,
-                                    progress: 100,
-                                    status: "completed",
-                                }
-                                : null
-                        );
-
-                        const completedJob = {
-                            ...newJob,
-                            status: "completed" as JobStatus,
-                            progress: 100,
-                            result: newImageUrl,
-                        };
-                        setEditHistory((prev) => [
-                            completedJob,
-                            ...prev.slice(0, 2),
-                        ]);
-
-                        await refreshCredits();
-                        return true;
-                    }
-                } catch (err) {
-                    console.log(
-                        `Poll attempt ${attempts}: AI still processing...`
+                if (loaded) {
+                    setProcessedImage(newImageUrl);
+                    setCurrentJob((prev) =>
+                        prev
+                            ? {
+                                ...prev,
+                                progress: 100,
+                                status: "completed",
+                            }
+                            : null
                     );
+
+                    const completedJob = {
+                        ...newJob,
+                        status: "completed" as JobStatus,
+                        progress: 100,
+                        result: newImageUrl,
+                    };
+                    setEditHistory((prev) => [
+                        completedJob,
+                        ...prev.slice(0, 2),
+                    ]);
+
+                    await refreshCredits();
+                    return true;
                 }
 
-                const progress = Math.min(10 + attempts * 1.5, 90);
+                const progress = Math.min(10 + attempts * 3, 90);
                 setCurrentJob((prev) => (prev ? { ...prev, progress } : null));
 
                 if (attempts >= maxAttempts) {
@@ -420,10 +417,17 @@ export default function Editor() {
         }
     };
 
-    const handleExport = (format: string) => {
+    const handleExport = async (format: string) => {
         if (!processedImage) return;
-
-        saveAs(processedImage, `PixSuite-${Date.now()}.${format}`);
+        try {
+            const response = await fetch(processedImage);
+            if (!response.ok) throw new Error("Download failed");
+            const blob = await response.blob();
+            saveAs(blob, `PixSuite-${Date.now()}.${format}`);
+        } catch (err) {
+            console.error("Export error:", err);
+            window.open(processedImage, "_blank");
+        }
     };
 
     const getCreditBadge = (credits: number) => {

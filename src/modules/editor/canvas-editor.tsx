@@ -16,10 +16,16 @@ export default function CanvasEditor({
 }: CanvasEditorProps) {
     const [showComparison, setShowComparison] = useState(false);
     const [sliderPosition, setSliderPosition] = useState(50);
-    const [isDragging, setIsDragging] = useState(false);
 
     const handleSliderMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isDragging && e.buttons !== 1) return;
+        if (e.buttons !== 1) return; // only respond to left-click drag
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        setSliderPosition(percentage);
+    };
+
+    const handleSliderClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
@@ -27,6 +33,7 @@ export default function CanvasEditor({
     };
 
     const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+        e.preventDefault();
         const touch = e.touches[0];
         const rect = e.currentTarget.getBoundingClientRect();
         const x = touch.clientX - rect.left;
@@ -131,9 +138,7 @@ export default function CanvasEditor({
                     <div
                         className="relative w-full h-full cursor-ew-resize select-none"
                         onMouseMove={handleSliderMove}
-                        onMouseDown={() => setIsDragging(true)}
-                        onMouseUp={() => setIsDragging(false)}
-                        onMouseLeave={() => setIsDragging(false)}
+                        onClick={handleSliderClick}
                         onTouchMove={handleTouchMove}
                     >
                         {/* Original */}
@@ -213,6 +218,7 @@ export default function CanvasEditor({
                                     processedImage ? "Processed" : "Original"
                                 }
                                 className="w-full h-full object-contain"
+                                loading="eager"
                             />
                         </motion.div>
                     </AnimatePresence>
