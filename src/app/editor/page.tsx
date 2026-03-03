@@ -892,7 +892,7 @@ export default function Editor() {
                                             )}
 
                                         {/* Status Steps */}
-                                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                                        <div className="flex items-center justify-center gap-1">
                                             {getStatusSteps().map(
                                                 (step, i) => (
                                                     <div
@@ -900,7 +900,7 @@ export default function Editor() {
                                                         className="flex items-center gap-1"
                                                     >
                                                         <div
-                                                            className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium whitespace-nowrap ${step.done
+                                                            className={`flex items-center gap-1 px-1 py-0.5 rounded-md text-[10px] font-medium whitespace-nowrap ${step.done
                                                                 ? "bg-primary/10 text-primary"
                                                                 : step.active
                                                                     ? "bg-muted text-foreground"
@@ -918,7 +918,7 @@ export default function Editor() {
                                                             {step.label}
                                                         </div>
                                                         {i < 2 && (
-                                                            <div className="w-2 h-px bg-border" />
+                                                            <div className="w-1.5 h-px bg-border" />
                                                         )}
                                                     </div>
                                                 )
