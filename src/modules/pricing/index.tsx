@@ -38,7 +38,7 @@ const plans = [
             "Unlimited basic transforms",
             "Email support",
         ],
-        limitations: ["No Pro BG removal (e-removedotbg)"],
+        limitations: ["No Pro BG removal"],
         cta: "Go Starter",
         popular: false,
         icon: Zap,
@@ -222,7 +222,7 @@ export default function Pricing() {
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
 
-            <div className="w-full px-6 sm:px-10 lg:px-16 relative z-10">
+            <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -247,17 +247,15 @@ export default function Pricing() {
                     </p>
                 </motion.div>
 
-                <div className="grid lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {plans?.map((plan, index) => (
                         <motion.div
                             key={plan.name}
-                            initial={{ opacity: 0, y: 50 }}
+                            initial={{ opacity: 0, y: 30 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            transition={{ duration: 0.8, delay: index * 0.15 }}
-                            whileHover={{ scale: 1.02, y: -5 }}
-                            className={`relative group rounded-xl ${plan.popular ? "lg:-mt-8" : ""
-                                }`}
+                            transition={{ duration: 0.5, delay: index * 0.1 }}
+                            className={`relative group rounded-2xl ${plan.popular ? "sm:-mt-4 lg:-mt-6" : ""}`}
                         >
                             <GlowingEffect
                                 blur={0}
@@ -269,101 +267,93 @@ export default function Pricing() {
                                 inactiveZone={0.01}
                                 alwaysActive={plan.popular}
                             />
-                            {plan.popular && (
-                                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                                    <div className="bg-primary/80 px-6 py-2 rounded-lg text-sm font-bold text-background">
-                                        Most Popular
-                                    </div>
+
+                            {(plan.popular || plan.proPopular) && (
+                                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
+                                    <span className="bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full whitespace-nowrap shadow-lg shadow-primary/25">
+                                        {plan.popular ? "Most Popular" : "Best Value"}
+                                    </span>
                                 </div>
                             )}
 
-                            {plan.proPopular && (
-                                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                                    <div className="bg-primary/80 px-6 py-2 rounded-lg text-sm font-bold text-background">
-                                        Best Value
-                                    </div>
-                                </div>
-                            )}
-
+                            {/* Card body */}
                             <div
-                                className={`h-full glass rounded-xl p-8 border dark:border-muted-foreground/30 transition-all duration-300 ${plan.popular
-                                    ? "border-primary/50 shadow-glow-primary"
-                                    : "hover:border-primary/30 shadow-glow-subtle hover:shadow-glow-primary"
+                                className={`relative h-full flex flex-col rounded-2xl p-6 border transition-all duration-300 ${plan.popular
+                                    ? "border-primary/50 bg-primary/3 shadow-[0_0_30px_-5px] shadow-primary/20"
+                                    : "border-border/60 bg-card/50 hover:border-primary/30 hover:bg-card/80"
                                     }`}
                             >
-                                <div className="text-center mb-8">
-                                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 bg-primary group-hover:animate-glow-pulse">
-                                        <plan.icon className="w-8 h-8 text-background" />
+                                {/* Header */}
+                                <div className="mb-5">
+                                    <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-3 ${plan.popular
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                                        } transition-colors`}>
+                                        <plan.icon className="w-5 h-5" />
                                     </div>
 
-                                    <div className="flex items-center justify-center gap-2 mb-2">
-                                        <h3 className="text-2xl font-bold text-foreground">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-lg font-bold text-foreground">
                                             {plan.name}
                                         </h3>
                                         {isPlanActive(plan.name) && (
-                                            <span className="px-2 py-1 text-xs font-semibold bg-primary text-primary-foreground rounded-full">
+                                            <span className="px-2 py-0.5 text-[10px] font-semibold bg-primary/15 text-primary rounded-full border border-primary/20">
                                                 Active
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-muted-foreground mb-4">
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
                                         {plan.description}
                                     </p>
-
-                                    <div className="mb-6">
-                                        <span className="text-5xl font-bold text-foreground">
-                                            {getDisplayPrice(plan)}
-                                        </span>
-                                        <span className="text-muted-foreground ml-2">
-                                            /{plan.period}
-                                        </span>
-                                        {isProRata(plan.name) && (
-                                            <div className="mt-2">
-                                                <span className="text-xs text-primary font-medium">
-                                                    Pro-rata upgrade
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
 
-                                <div className="space-y-4 mb-16">
+                                {/* Price */}
+                                <div className="mb-5 pb-5 border-b border-border/50">
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-4xl font-bold text-foreground tracking-tight">
+                                            {getDisplayPrice(plan)}
+                                        </span>
+                                        <span className="text-sm text-muted-foreground">
+                                            /{plan.period}
+                                        </span>
+                                    </div>
+                                    {isProRata(plan.name) && (
+                                        <p className="text-xs text-primary font-medium mt-1">
+                                            Pro-rata upgrade price
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Features */}
+                                <div className="space-y-3 mb-6 flex-1">
                                     {plan?.features?.map((feature, fi) => (
-                                        <div
-                                            key={fi}
-                                            className={
-                                                "flex items-center space-x-3"
-                                            }
-                                        >
-                                            <div className="shrink-0 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-                                                <Check className="w-3 h-3 text-primary" />
-                                            </div>
-                                            <span className="text-muted-foreground">
+                                        <div key={fi} className="flex items-start gap-2.5">
+                                            <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                                            <span className="text-sm text-muted-foreground leading-snug">
                                                 {feature}
                                             </span>
                                         </div>
                                     ))}
 
                                     {plan?.limitations?.map((limitation) => (
-                                        <div
-                                            key={limitation}
-                                            className="flex items-center space-x-3"
-                                        >
-                                            <div className="shrink-0 w-5 h-5 rounded-full bg-destructive/80 flex items-center justify-center">
-                                                <div className="w-3 h-0.5 bg-primary-foreground" />
+                                        <div key={limitation} className="flex items-start gap-2.5">
+                                            <div className="w-4 h-4 shrink-0 mt-0.5 flex items-center justify-center">
+                                                <div className="w-2.5 h-0.5 bg-muted-foreground/40 rounded-full" />
                                             </div>
-                                            <span className="text-muted-foreground">
+                                            <span className="text-sm text-muted-foreground/60 leading-snug">
                                                 {limitation}
                                             </span>
                                         </div>
                                     ))}
                                 </div>
 
+                                {/* CTA Button */}
                                 <Button
-                                    variant={
-                                        plan.popular ? "default" : "outline"
-                                    }
-                                    className="w-[90%] font-semibold cursor-pointer absolute left-1/2 -translate-x-1/2 bottom-4 rounded-lg mb-2"
+                                    variant={plan.popular ? "default" : "outline"}
+                                    className={`w-full font-semibold cursor-pointer rounded-xl h-11 ${plan.popular
+                                        ? ""
+                                        : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                                        }`}
                                     onClick={() => handlePlanClick(plan.name)}
                                     disabled={
                                         (plan.name === "Free" &&
