@@ -155,11 +155,13 @@ export default function PaymentModal({
                         const result = await verifyResponse.json();
 
                         if (result.success) {
+                            sessionStorage.setItem("pixsuite_payment", "upgraded");
                             window.location.href = `/?upgraded=${plan}`;
                         } else {
                             throw new Error("Payment verification failed");
                         }
                     } catch (err) {
+                        sessionStorage.setItem("pixsuite_payment", "failed");
                         window.location.href = "/?payment_failed=true";
                         console.error("Payment verification error:", err);
                     } finally {
@@ -172,6 +174,7 @@ export default function PaymentModal({
                 modal: {
                     ondismiss: function () {
                         setIsLoading(false);
+                        sessionStorage.setItem("pixsuite_payment", "cancelled");
                         window.location.href = "/?payment_cancelled=true";
                     },
                 },

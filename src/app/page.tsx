@@ -1,125 +1,92 @@
 'use client'
 
-import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useEffect } from "react";
 import Footer from "@/components/footer";
-import Editor from "@/modules/editor";
 import Features from "@/modules/features";
 import Hero from "@/modules/hero";
 import Pricing from "@/modules/pricing";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle2Icon, InfoIcon, OctagonX, X } from "lucide-react";
+import { toast } from "sonner";
+import { CheckCircle2Icon, OctagonXIcon, InfoIcon } from "lucide-react";
+
+const PLAN_BENEFITS: Record<string, { credits: string; uploads: string; highlight: string }> = {
+    Starter: {
+        credits: "3,000",
+        uploads: "500",
+        highlight: "AI-powered editing tools",
+    },
+    Lite: {
+        credits: "10,000",
+        uploads: "5,000",
+        highlight: "Pro background removal & all AI tools",
+    },
+    Pro: {
+        credits: "25,000",
+        uploads: "20,000",
+        highlight: "Maximum power for professionals",
+    },
+};
 
 export default function Home() {
 
-    const [paymentStatus, setPaymentStatus] = useState<"upgraded" | "failed" | "cancelled" | null>(null);
-    const [plan, setPlan] = useState<string>("Pro");
-
-    // handle payment success/fail/cancel toast from URL params
+    // handle payment success/fail/cancel from URL params
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const upgraded = urlParams.get("upgraded");
         const failed = urlParams.get("payment_failed");
         const cancelled = urlParams.get("payment_cancelled");
 
-        if (upgraded) {
-            setPaymentStatus("upgraded");
-            setPlan(upgraded === "Lite" ? "Lite" : "Pro");
-            window.history.replaceState({}, "", "/");
-        } else if (failed) {
-            setPaymentStatus("failed");
-            window.history.replaceState({}, "", "/");
-        } else if (cancelled) {
-            setPaymentStatus("cancelled");
-            window.history.replaceState({}, "", "/");
-        } else {
-            setPaymentStatus(null);
-            window.history.replaceState({}, "", "/");
-        }
-    }, []);
+        if (!upgraded && !failed && !cancelled) return;
 
+        // verify this came from an actual payment flow, not manual URL manipulation
+        const paymentFlag = sessionStorage.getItem("pixsuite_payment");
+        sessionStorage.removeItem("pixsuite_payment");
+
+        // clean URL immediately
+        window.history.replaceState({}, "", "/");
+
+        if (!paymentFlag) return;
+
+        // delay toast to ensure <Toaster> is mounted after page reload
+        const timer = setTimeout(() => {
+            if (upgraded) {
+                const benefits = PLAN_BENEFITS[upgraded];
+                if (benefits) {
+                    toast.success(`Welcome to ${upgraded}!`, {
+                        description: `You now have ${benefits.credits} credits and ${benefits.uploads} uploads/month. ${benefits.highlight}.`,
+                        duration: 8000,
+                        icon: <CheckCircle2Icon className="size-4" />,
+                    });
+                } else {
+                    toast.success("Payment successful!", {
+                        description: "Your plan has been upgraded. Enjoy your new features!",
+                        duration: 6000,
+                        icon: <CheckCircle2Icon className="size-4" />,
+                    });
+                }
+            } else if (failed) {
+                toast.error("Payment verification failed", {
+                    description: "Your payment could not be verified. If you were charged, please contact support and we'll resolve it immediately.",
+                    duration: 10000,
+                    icon: <OctagonXIcon className="size-4" />,
+                });
+            } else if (cancelled) {
+                toast("Payment cancelled", {
+                    description: "No worries! You can upgrade anytime.",
+                    duration: 5000,
+                    icon: <InfoIcon className="size-4" />,
+                });
+            }
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, []);
 
     return (
         <div>
-            <AnimatePresence>
-                {paymentStatus && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -50 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -50 }}
-                        className={`fixed bottom-8 right-4 z-50 p-0 rounded-lg`}
-                    >
-                        <div className="grid w-full max-w-md items-start gap-4">
-
-                            {
-                                paymentStatus === "upgraded" ? (
-                                    <>
-                                        <div className="flex items-center bg-card">
-                                            <Alert>
-                                                <CheckCircle2Icon />
-                                                <AlertTitle>Payment successful</AlertTitle>
-                                                <AlertDescription>
-                                                    {plan === "Lite"
-                                                        ? "🎉 Welcome to Lite! You now have 1000 uploads/month."
-                                                        : "🎉 Welcome to Pro! You now have unlimited uploads."
-                                                    }
-                                                </AlertDescription>
-                                            </Alert>
-                                            <button
-                                                onClick={() => setPaymentStatus(null)}
-                                                className="mr-4 hover:opacity-70 cursor-pointer"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        </div>
-
-                                    </>
-                                ) : paymentStatus === "failed" ? (
-                                    <>
-                                        <div className="flex items-center bg-card">
-                                            <Alert>
-                                                <OctagonX />
-                                                <AlertTitle>Payment verification failed</AlertTitle>
-                                                <AlertDescription>
-                                                    Please contact support!
-                                                </AlertDescription>
-                                            </Alert>
-                                            <button
-                                                onClick={() => setPaymentStatus(null)}
-                                                className="mr-4 hover:opacity-70 cursor-pointer"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </>
-                                ) : paymentStatus === "cancelled" ? (
-                                    <>
-                                        <div className="flex items-center bg-card">
-                                            <Alert>
-                                                <InfoIcon />
-                                                <AlertTitle>Payment cancelled</AlertTitle>
-                                                <AlertDescription>
-                                                    You can upgrade anytime!
-                                                </AlertDescription>
-                                            </Alert>
-                                            <button
-                                                onClick={() => setPaymentStatus(null)}
-                                                className="mr-4 hover:opacity-70 cursor-pointer"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </>
-                                ) : null
-                            }
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
             <Hero />
             <Features />
             <Pricing />
             <Footer />
-        </div >
+        </div>
     );
 }
