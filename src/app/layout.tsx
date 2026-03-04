@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Poppins } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 import Provider from "./providers";
 import Navbar from "@/components/navbar";
@@ -49,6 +50,7 @@ export default function RootLayout({
                     <Provider>
                         <Navbar />
                         {children}
+                        <Toaster richColors />
                     </Provider>
                 </ThemeProvider>
             </body>

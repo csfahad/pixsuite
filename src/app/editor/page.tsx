@@ -21,6 +21,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "motion/react";
 import { saveAs } from "file-saver";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -172,9 +173,11 @@ export default function Editor() {
 
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
     const [processedImage, setProcessedImage] = useState<string | null>(null);
+    const [processedImageHQ, setProcessedImageHQ] = useState<string | null>(null);
     const [currentJob, setCurrentJob] = useState<ProcessingJob | null>(null);
     const [editHistory, setEditHistory] = useState<ProcessingJob[]>([]);
     const [activeEffects, setActiveEffects] = useState<Set<string>>(new Set());
+    const [effectPrompts, setEffectPrompts] = useState<Record<string, string>>({});
     const [promptText, setPromptText] = useState<string>("");
     const [showPromptInput, setShowPromptInput] = useState<boolean>(false);
     const [promptToolId, setPromptToolId] = useState<string | null>(null);
@@ -214,7 +217,10 @@ export default function Editor() {
     const handleImageUpload = (imageUrl: string) => {
         setUploadedImage(imageUrl);
         setProcessedImage(null);
+        setProcessedImageHQ(null);
         setCurrentJob(null);
+        setActiveEffects(new Set());
+        setEffectPrompts({});
     };
 
     const handlePromptSubmit = async () => {
@@ -236,8 +242,8 @@ export default function Editor() {
                 ? `e-edit-prompt-${encodeURIComponent(prompt)}`
                 : "e-edit",
             "bg-genfill": prompt
-                ? `bg-genfill-prompt-${encodeURIComponent(prompt)},w-2000,h-2000,cm-pad_resize`
-                : "bg-genfill,w-2000,h-2000,cm-pad_resize",
+                ? `bg-genfill-prompt-${encodeURIComponent(prompt)},w-1000,h-1000,cm-pad_resize`
+                : "bg-genfill,w-1000,h-1000,cm-pad_resize",
             "e-dropshadow": "e-dropshadow",
             "e-retouch": "e-retouch",
             "e-upscale": "e-upscale",
@@ -321,14 +327,20 @@ export default function Editor() {
             newActiveEffects.delete(toolId);
             setActiveEffects(newActiveEffects);
 
+            // remove stored prompt for this effect
+            const newPrompts = { ...effectPrompts };
+            delete newPrompts[toolId];
+            setEffectPrompts(newPrompts);
+
             const remainingEffects = Array.from(newActiveEffects);
             const newImageUrl =
                 remainingEffects.length > 0
                     ? `${uploadedImage}?tr=${remainingEffects
-                        .map((effect) => getImageKitTransform(effect))
+                        .map((effect) => getImageKitTransform(effect, newPrompts[effect]))
                         .join(":")}`
                     : uploadedImage;
             setProcessedImage(newImageUrl);
+            setProcessedImageHQ(remainingEffects.length > 0 ? newImageUrl : null);
             return;
         }
 
@@ -364,11 +376,22 @@ export default function Editor() {
         newActiveEffects.add(toolId);
         setActiveEffects(newActiveEffects);
 
+        // store the prompt for this effect so it's preserved when chaining
+        const newPrompts = { ...effectPrompts };
+        if (prompt) {
+            newPrompts[toolId] = prompt;
+        }
+        setEffectPrompts(newPrompts);
+
+        // build transforms using stored prompts for ALL effects
         const allEffects = Array.from(newActiveEffects);
         const transforms = allEffects.map((effect) =>
-            getImageKitTransform(effect, effect === toolId ? prompt : undefined)
+            getImageKitTransform(effect, effect === toolId ? prompt : newPrompts[effect])
         );
         const newImageUrl = `${uploadedImage}?tr=${transforms.join(":")}`;
+
+        // low-quality preview URL for instant display
+        const previewUrl = `${uploadedImage}?tr=${transforms.join(":")},q-40`;
 
         try {
             setCurrentJob((prev) =>
@@ -379,12 +402,13 @@ export default function Editor() {
             const maxAttempts = 30;
             const pollInterval = 2000;
 
+            // use Image() for preloading — avoids CORS issues with HEAD fetch
+            // and pre-caches the image for instant display
             const preloadImage = (url: string): Promise<boolean> => {
                 return new Promise((resolve) => {
-                    const img = new Image();
+                    const img = new window.Image();
                     img.onload = () => resolve(true);
                     img.onerror = () => resolve(false);
-                    // add cache buster to avoid stale cached responses
                     img.src = url + (url.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
                 });
             };
@@ -392,10 +416,20 @@ export default function Editor() {
             const pollImageKit = async (): Promise<boolean> => {
                 attempts++;
 
+                // first try low-quality preview for fast display
+                if (attempts === 1) {
+                    const previewLoaded = await preloadImage(previewUrl);
+                    if (previewLoaded) {
+                        setProcessedImage(previewUrl);
+                    }
+                }
+
                 const loaded = await preloadImage(newImageUrl);
 
                 if (loaded) {
+                    // swap to full quality
                     setProcessedImage(newImageUrl);
+                    setProcessedImageHQ(newImageUrl);
                     setCurrentJob((prev) =>
                         prev
                             ? {
@@ -425,8 +459,8 @@ export default function Editor() {
                 setCurrentJob((prev) => (prev ? { ...prev, progress } : null));
 
                 if (attempts >= maxAttempts) {
-                    // still set the image URL — it may load when browser retries
                     setProcessedImage(newImageUrl);
+                    setProcessedImageHQ(newImageUrl);
                     setCurrentJob((prev) =>
                         prev
                             ? { ...prev, progress: 100, status: "completed" }
@@ -455,6 +489,7 @@ export default function Editor() {
             await pollImageKit();
         } catch (err) {
             console.error("Error applying effect:", err);
+            toast.error("Failed to apply transformation. Please try again.");
             setCurrentJob((prev) =>
                 prev ? { ...prev, status: "error" } : null
             );
@@ -462,16 +497,34 @@ export default function Editor() {
     };
 
     const handleExport = async (format: string) => {
-        if (!processedImage) return;
+        // always download full quality image
+        const downloadUrl = processedImageHQ || processedImage;
+        if (!downloadUrl) return;
         try {
-            const response = await fetch(processedImage);
-            if (!response.ok) throw new Error("Download failed");
+            const response = await fetch(downloadUrl);
+            if (!response.ok) {
+                // try to read error message from imagekit
+                const contentType = response.headers.get("content-type") || "";
+                if (contentType.includes("text")) {
+                    const errorText = await response.text();
+                    toast.error(errorText || "Transformation failed. Please try again.");
+                } else {
+                    toast.error("Download failed. The transformation may have encountered an error.");
+                }
+                return;
+            }
+            // verify we got an actual image, not an error page
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.startsWith("image/")) {
+                const errorText = await response.text();
+                toast.error(errorText || "Transformation failed. Please try again.");
+                return;
+            }
             const blob = await response.blob();
             saveAs(blob, `PixSuite-${Date.now()}.${format}`);
         } catch (err) {
             console.error("Export error:", err);
-            // fallback: open in new tab for manual save
-            window.open(processedImage, "_blank");
+            toast.error("Failed to download. Please check your connection and try again.");
         }
     };
 
