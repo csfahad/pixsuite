@@ -80,7 +80,7 @@ export default function Navbar() {
                 data-state={menuState && 'active'}
                 className={cn('fixed z-20 w-full transition-colors duration-150', scrolled && 'border-b bg-background/50 backdrop-blur-3xl')}
             >
-                <div className="mx-auto w-full px-6 lg:px-16 transition-all duration-300">
+                <div className="mx-auto max-w-7xl px-6 lg:px-16 transition-all duration-300">
                     <div className="relative flex flex-wrap items-center justify-between gap-4 py-3 lg:py-4">
                         <motion.div
                             whileHover={{ scale: 1.05 }}
