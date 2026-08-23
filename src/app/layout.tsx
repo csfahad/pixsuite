@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Poppins } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -51,6 +52,7 @@ export default function RootLayout({
                         <Navbar />
                         {children}
                         <Toaster richColors />
+			<Analytics />
                     </Provider>
                 </ThemeProvider>
             </body>
