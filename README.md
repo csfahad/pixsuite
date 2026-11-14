@@ -8,7 +8,7 @@ This document is an internal engineering and operator reference for the product 
 
 |                     |                                                            |
 | :------------------ | :--------------------------------------------------------- |
-| **Live deployment** | [https://pixsuite.csfahad.me](https://pixsuite.csfahad.me) |
+| **Live deployment** | [https://pixsuite.csfahad.in](https://pixsuite.csfahad.in) |
 | **Developer (X)**   | [https://x.com/csfahad_x](https://x.com/csfahad_x)         |
 | **Email**           | [csfahad.dev@gmail.com](mailto:csfahad.dev@gmail.com)      |
 
