@@ -23,11 +23,8 @@ export default function BeforeAfterSlider() {
         setSliderPosition(percentage);
     };
 
-    // before/after images
-    const beforeImage =
-        "https://ik.imagekit.io/sjbr5usgh/pixora-uploads/Roadster_Hero_W0sp0doWK.webp";
-    const afterImage =
-        "https://ik.imagekit.io/sjbr5usgh/pixora-uploads/Roadster_Hero_W0sp0doWK.webp?tr=e-changebg-prompt-Change%20scene%20to%20snowy%20alpine%20road%2C%20cold%20blue%20tones%2C%20clean%20snowbanks%3B%20keep%20car%20untouched";
+    const beforeImage = "/hero/jellyfish-before.webp";
+    const afterImage = "/hero/jellyfish-after.webp";
 
     return (
         <motion.div
@@ -47,7 +44,7 @@ export default function BeforeAfterSlider() {
                 <div className="absolute inset-0">
                     <img
                         src={beforeImage}
-                        alt="Before - Original car on road"
+                        alt="Before - A luminous blue jellyfish in deep water"
                         className="w-full h-full object-cover select-none"
                     />
                 </div>
@@ -61,7 +58,7 @@ export default function BeforeAfterSlider() {
                 >
                     <img
                         src={afterImage}
-                        alt="After - Car with snowy alpine background"
+                        alt="After - The same jellyfish floating through a colorful cosmic nebula"
                         className="w-full h-full object-cover select-none"
                     />
                 </div>
@@ -83,10 +80,10 @@ export default function BeforeAfterSlider() {
                 </div>
 
                 {/* Labels */}
-                <div className="absolute bottom-4 left-4 text-xs font-medium text-primary">
+                <div className="absolute bottom-4 left-4 text-xs font-medium text-white">
                     AFTER
                 </div>
-                <div className="absolute bottom-4 right-4 text-xs font-medium text-secondary">
+                <div className="absolute bottom-4 right-4 text-xs font-medium text-white">
                     BEFORE
                 </div>
             </div>
