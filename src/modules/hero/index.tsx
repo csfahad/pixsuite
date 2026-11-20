@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Play, ArrowRight, WandSparkles } from "lucide-react";
+import { Play, ArrowRight } from "lucide-react";
 import BeforeAfterSlider from "./BeforeAfterSlider";
 import Link from "next/link";
 
@@ -37,7 +37,8 @@ export default function Hero() {
     const isStarterPlan = currentPlan === "Starter";
     const isLitePlan = currentPlan === "Lite";
     const isProPlan = currentPlan === "Pro";
-    const isFreeAndLimitReached = isFreePlan && usageData && !usageData.canUpload;
+    const isFreeAndLimitReached =
+        isFreePlan && usageData && !usageData.canUpload;
 
     const scrollToSection = (sectionId: string) => {
         const element = document.getElementById(sectionId);
@@ -70,18 +71,6 @@ export default function Hero() {
                         transition={{ duration: 0.8 }}
                         className="text-center"
                     >
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                            className="inline-flex items-center justify-center space-x-2 rounded-lg px-4 py-2 mb-6 glass border dark:border-muted-foreground/30"
-                        >
-                            <WandSparkles className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-medium">
-                                Powered by AI Magic
-                            </span>
-                        </motion.div>
-
                         <motion.h1
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -153,7 +142,9 @@ export default function Hero() {
                                     <Button
                                         variant="default"
                                         size="lg"
-                                        onClick={() => scrollToSection("pricing")}
+                                        onClick={() =>
+                                            scrollToSection("pricing")
+                                        }
                                         className="group cursor-pointer"
                                     >
                                         Start Plan
@@ -167,7 +158,9 @@ export default function Hero() {
                                     <Button
                                         variant="secondary"
                                         size="lg"
-                                        onClick={() => scrollToSection("pricing")}
+                                        onClick={() =>
+                                            scrollToSection("pricing")
+                                        }
                                         className="group cursor-pointer"
                                     >
                                         Upgrade Plan
@@ -191,7 +184,9 @@ export default function Hero() {
                                     <Button
                                         variant="secondary"
                                         size="lg"
-                                        onClick={() => scrollToSection("pricing")}
+                                        onClick={() =>
+                                            scrollToSection("pricing")
+                                        }
                                         className="group cursor-pointer"
                                     >
                                         Switch to Pro
@@ -240,7 +235,10 @@ export default function Hero() {
                                     <span>Starter — perfect kickoff</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: "#8b5cf6" }} />
+                                    <div
+                                        className="w-2 h-2 rounded-full animate-pulse shrink-0"
+                                        style={{ backgroundColor: "#8b5cf6" }}
+                                    />
                                     <span>Lite — power without limits</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
