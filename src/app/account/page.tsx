@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
 import { motion, AnimatePresence } from "motion/react";
 import {
     User,
@@ -60,16 +61,19 @@ const tabs: { id: Tab; label: string; icon: typeof User }[] = [
     { id: "plan", label: "Plan & Billing", icon: CreditCard },
 ];
 
-const planConfig: Record<string, {
-    icon: typeof Star;
-    color: string;
-    bg: string;
-    border: string;
-    label: string;
-    description: string;
-    price: string;
-    period: string;
-}> = {
+const planConfig: Record<
+    string,
+    {
+        icon: typeof Star;
+        color: string;
+        bg: string;
+        border: string;
+        label: string;
+        description: string;
+        price: string;
+        period: string;
+    }
+> = {
     Free: {
         icon: Star,
         color: "text-muted-foreground",
@@ -132,7 +136,7 @@ function AccountPageContent() {
     const searchParams = useSearchParams();
 
     const [activeTab, setActiveTab] = useState<Tab>(
-        (searchParams.get("tab") as Tab) || "account"
+        (searchParams.get("tab") as Tab) || "account",
     );
     const [userData, setUserData] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -159,6 +163,7 @@ function AccountPageContent() {
             if (res.ok) {
                 const data = await res.json();
                 setUserData(data);
+                setAnalyticsPlan(data.plan);
                 setNewName(data.name);
             }
         } catch (err) {
@@ -182,6 +187,7 @@ function AccountPageContent() {
     }, [searchParams]);
 
     const handleTabChange = (tab: Tab) => {
+        trackEvent("account_tab_selected", { tab });
         setActiveTab(tab);
         const url = new URL(window.location.href);
         url.searchParams.set("tab", tab);
@@ -208,6 +214,7 @@ function AccountPageContent() {
                 setUserData(updated);
                 setEditingName(false);
                 setSaveSuccess(true);
+                trackEvent("account_profile_updated", { field: "name" });
                 setTimeout(() => setSaveSuccess(false), 2500);
             } else {
                 const err = await res.json();
@@ -250,9 +257,10 @@ function AccountPageContent() {
         return `${Math.floor(diffDays / 365)} years ago`;
     };
 
-    const creditPercentage = userData && userData.creditLimit > 0
-        ? Math.min((userData.creditsUsed / userData.creditLimit) * 100, 100)
-        : 0;
+    const creditPercentage =
+        userData && userData.creditLimit > 0
+            ? Math.min((userData.creditsUsed / userData.creditLimit) * 100, 100)
+            : 0;
 
     const uploadPercentage = userData
         ? Math.min((userData.uploadCount / userData.uploadLimit) * 100, 100)
@@ -275,7 +283,11 @@ function AccountPageContent() {
             <div className="min-h-screen flex items-center justify-center">
                 <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                    transition={{
+                        repeat: Infinity,
+                        duration: 1,
+                        ease: "linear",
+                    }}
                 >
                     <Loader2 className="h-8 w-8 text-muted-foreground" />
                 </motion.div>
@@ -285,7 +297,7 @@ function AccountPageContent() {
 
     return (
         <TooltipProvider>
-            <div className="min-h-screen bg-background pt-28 pb-12">
+            <div className="ph-no-capture min-h-screen bg-background pt-28 pb-12">
                 {/* Page header */}
                 <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 mb-8">
                     <motion.div
@@ -318,11 +330,14 @@ function AccountPageContent() {
                                     return (
                                         <button
                                             key={tab.id}
-                                            onClick={() => handleTabChange(tab.id)}
+                                            onClick={() =>
+                                                handleTabChange(tab.id)
+                                            }
                                             className={`relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap cursor-pointer
-                                                ${isActive
-                                                    ? "text-foreground"
-                                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                                ${
+                                                    isActive
+                                                        ? "text-foreground"
+                                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                                                 }`}
                                         >
                                             {isActive && (
@@ -400,7 +415,9 @@ function AccountPageContent() {
                                         uploadPercentage={uploadPercentage}
                                         creditsRemaining={creditsRemaining}
                                         uploadsRemaining={uploadsRemaining}
-                                        isSubscriptionActive={isSubscriptionActive}
+                                        isSubscriptionActive={
+                                            isSubscriptionActive
+                                        }
                                         formatDate={formatDate}
                                     />
                                 )}
@@ -461,7 +478,11 @@ function AccountTab({
                     <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
                         <motion.div
                             whileHover={{ scale: 1.05 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 17,
+                            }}
                         >
                             <Avatar className="h-20 w-20 border-4 border-background shadow-lg">
                                 <AvatarImage
@@ -523,10 +544,13 @@ function AccountTab({
                                                     setSaveError(null);
                                                 }}
                                                 onKeyDown={(e) => {
-                                                    if (e.key === "Enter") handleSaveName();
+                                                    if (e.key === "Enter")
+                                                        handleSaveName();
                                                     if (e.key === "Escape") {
                                                         setEditingName(false);
-                                                        setNewName(userData.name);
+                                                        setNewName(
+                                                            userData.name,
+                                                        );
                                                     }
                                                 }}
                                                 className="h-8 text-sm max-w-[240px]"
@@ -567,8 +591,14 @@ function AccountTab({
                                     <AnimatePresence>
                                         {saveError && (
                                             <motion.p
-                                                initial={{ opacity: 0, height: 0 }}
-                                                animate={{ opacity: 1, height: "auto" }}
+                                                initial={{
+                                                    opacity: 0,
+                                                    height: 0,
+                                                }}
+                                                animate={{
+                                                    opacity: 1,
+                                                    height: "auto",
+                                                }}
                                                 exit={{ opacity: 0, height: 0 }}
                                                 className="text-xs text-destructive mt-1"
                                             >
@@ -577,8 +607,14 @@ function AccountTab({
                                         )}
                                         {saveSuccess && (
                                             <motion.p
-                                                initial={{ opacity: 0, height: 0 }}
-                                                animate={{ opacity: 1, height: "auto" }}
+                                                initial={{
+                                                    opacity: 0,
+                                                    height: 0,
+                                                }}
+                                                animate={{
+                                                    opacity: 1,
+                                                    height: "auto",
+                                                }}
                                                 exit={{ opacity: 0, height: 0 }}
                                                 className="text-xs text-emerald-500 mt-1 flex items-center gap-1"
                                             >
@@ -704,14 +740,15 @@ function PlanTab({
             {/* Current plan card */}
             <Card className={`border-border/50 overflow-hidden`}>
                 <div
-                    className={`h-2 ${userData.plan === "Pro"
-                        ? "bg-linear-to-r from-amber-500 to-orange-500"
-                        : userData.plan === "Lite"
-                            ? "bg-linear-to-r from-blue-500 to-cyan-500"
-                            : userData.plan === "Starter"
+                    className={`h-2 ${
+                        userData.plan === "Pro"
+                            ? "bg-linear-to-r from-amber-500 to-orange-500"
+                            : userData.plan === "Lite"
+                              ? "bg-linear-to-r from-blue-500 to-cyan-500"
+                              : userData.plan === "Starter"
                                 ? "bg-linear-to-r from-emerald-500 to-teal-500"
                                 : "bg-linear-to-r from-muted-foreground/30 to-muted-foreground/10"
-                        }`}
+                    }`}
                 />
                 <CardContent className="p-6">
                     <div className="flex items-start justify-between">
@@ -725,9 +762,7 @@ function PlanTab({
                                 }}
                                 className={`h-14 w-14 rounded-xl ${plan.bg} flex items-center justify-center`}
                             >
-                                <PlanIcon
-                                    className={`h-7 w-7 ${plan.color}`}
-                                />
+                                <PlanIcon className={`h-7 w-7 ${plan.color}`} />
                             </motion.div>
                             <div>
                                 <div className="flex items-center gap-2">
@@ -754,9 +789,12 @@ function PlanTab({
                                 size="sm"
                                 className="shrink-0 cursor-pointer gap-1"
                                 onClick={() => {
-                                    const el = document.getElementById("pricing");
+                                    const el =
+                                        document.getElementById("pricing");
                                     if (el) {
-                                        el.scrollIntoView({ behavior: "smooth" });
+                                        el.scrollIntoView({
+                                            behavior: "smooth",
+                                        });
                                     } else {
                                         window.location.href = "/#pricing";
                                     }
@@ -777,7 +815,9 @@ function PlanTab({
                                 <DollarSign className="h-4 w-4 text-primary" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Plan Amount</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                                    Plan Amount
+                                </p>
                                 <p className="text-sm font-semibold text-foreground">
                                     {plan.price}
                                     <span className="text-xs font-normal text-muted-foreground">
@@ -794,7 +834,9 @@ function PlanTab({
                                     <CalendarCheck className="h-4 w-4 text-primary" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Subscribed On</p>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                                        Subscribed On
+                                    </p>
                                     <p className="text-sm font-semibold text-foreground">
                                         {formatDate(userData.createdAt)}
                                     </p>
@@ -805,18 +847,37 @@ function PlanTab({
                         {/* Renewal / expiry */}
                         {userData.subscriptionExpiresAt && (
                             <div className="flex items-center gap-3">
-                                <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${isSubscriptionActive ? "bg-emerald-500/10" : "bg-destructive/10"
-                                    }`}>
-                                    <Calendar className={`h-4 w-4 ${isSubscriptionActive ? "text-emerald-500" : "text-destructive"
-                                        }`} />
+                                <div
+                                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                                        isSubscriptionActive
+                                            ? "bg-emerald-500/10"
+                                            : "bg-destructive/10"
+                                    }`}
+                                >
+                                    <Calendar
+                                        className={`h-4 w-4 ${
+                                            isSubscriptionActive
+                                                ? "text-emerald-500"
+                                                : "text-destructive"
+                                        }`}
+                                    />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        {isSubscriptionActive ? "Expires On" : "Expired On"}
+                                        {isSubscriptionActive
+                                            ? "Expires On"
+                                            : "Expired On"}
                                     </p>
-                                    <p className={`text-sm font-semibold ${isSubscriptionActive ? "text-foreground" : "text-destructive"
-                                        }`}>
-                                        {formatDate(userData.subscriptionExpiresAt)}
+                                    <p
+                                        className={`text-sm font-semibold ${
+                                            isSubscriptionActive
+                                                ? "text-foreground"
+                                                : "text-destructive"
+                                        }`}
+                                    >
+                                        {formatDate(
+                                            userData.subscriptionExpiresAt,
+                                        )}
                                     </p>
                                 </div>
                             </div>
@@ -841,25 +902,28 @@ function PlanTab({
                                     {userData.creditsUsed.toLocaleString()}
                                     <span className="text-base font-normal text-muted-foreground">
                                         {" "}
-                                        / {userData.creditLimit.toLocaleString()}
+                                        /{" "}
+                                        {userData.creditLimit.toLocaleString()}
                                     </span>
                                 </p>
                             </div>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div
-                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${creditPercentage >= 90
-                                            ? "bg-destructive/10 text-destructive"
-                                            : creditPercentage >= 70
-                                                ? "bg-amber-500/10 text-amber-500"
-                                                : "bg-emerald-500/10 text-emerald-500"
-                                            }`}
+                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${
+                                            creditPercentage >= 90
+                                                ? "bg-destructive/10 text-destructive"
+                                                : creditPercentage >= 70
+                                                  ? "bg-amber-500/10 text-amber-500"
+                                                  : "bg-emerald-500/10 text-emerald-500"
+                                        }`}
                                     >
                                         {Math.round(creditPercentage)}%
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {creditsRemaining.toLocaleString()} credits remaining
+                                    {creditsRemaining.toLocaleString()} credits
+                                    remaining
                                 </TooltipContent>
                             </Tooltip>
                         </div>
@@ -878,10 +942,12 @@ function PlanTab({
                             </motion.div>
                             <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>
-                                    {creditsRemaining.toLocaleString()} remaining
+                                    {creditsRemaining.toLocaleString()}{" "}
+                                    remaining
                                 </span>
                                 <span>
-                                    {userData.creditLimit.toLocaleString()} total
+                                    {userData.creditLimit.toLocaleString()}{" "}
+                                    total
                                 </span>
                             </div>
                         </div>
@@ -905,25 +971,28 @@ function PlanTab({
                                     {userData.uploadCount.toLocaleString()}
                                     <span className="text-base font-normal text-muted-foreground">
                                         {" "}
-                                        / {userData.uploadLimit.toLocaleString()}
+                                        /{" "}
+                                        {userData.uploadLimit.toLocaleString()}
                                     </span>
                                 </p>
                             </div>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div
-                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${uploadPercentage >= 90
-                                            ? "bg-destructive/10 text-destructive"
-                                            : uploadPercentage >= 70
-                                                ? "bg-amber-500/10 text-amber-500"
-                                                : "bg-emerald-500/10 text-emerald-500"
-                                            }`}
+                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${
+                                            uploadPercentage >= 90
+                                                ? "bg-destructive/10 text-destructive"
+                                                : uploadPercentage >= 70
+                                                  ? "bg-amber-500/10 text-amber-500"
+                                                  : "bg-emerald-500/10 text-emerald-500"
+                                        }`}
                                     >
                                         {Math.round(uploadPercentage)}%
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {uploadsRemaining.toLocaleString()} uploads remaining
+                                    {uploadsRemaining.toLocaleString()} uploads
+                                    remaining
                                 </TooltipContent>
                             </Tooltip>
                         </div>
@@ -942,10 +1011,12 @@ function PlanTab({
                             </motion.div>
                             <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>
-                                    {uploadsRemaining.toLocaleString()} remaining
+                                    {uploadsRemaining.toLocaleString()}{" "}
+                                    remaining
                                 </span>
                                 <span>
-                                    {userData.uploadLimit.toLocaleString()} total
+                                    {userData.uploadLimit.toLocaleString()}{" "}
+                                    total
                                 </span>
                             </div>
                         </div>
@@ -1040,8 +1111,8 @@ function PlanTab({
                                                 : "Upgrade for more credits and uploads"}
                                         </h4>
                                         <p className="text-sm text-muted-foreground">
-                                            Get access to all features and higher
-                                            limits
+                                            Get access to all features and
+                                            higher limits
                                         </p>
                                     </div>
                                 </div>
