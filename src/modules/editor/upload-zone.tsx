@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PaymentModal from "@/components/modals/payment-modal";
 import type { PlanType } from "@/lib/plans";
+import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
 
 interface UploadZoneProps {
     onImageUpload: (imageUrl: string) => void;
@@ -30,13 +31,27 @@ interface UsageData {
     subscriptionExpiresAt?: string | null;
 }
 
-export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: UploadZoneProps) {
-    const { data: session } = useSession();
+interface UploadAuthData {
+    token: string;
+    expire: number;
+    signature: string;
+    publicKey: string;
+    usage: UsageData;
+}
+
+export default function UploadZone({
+    onImageUpload,
+    updatedCreditsRemaining,
+}: UploadZoneProps) {
+    const { data: session, status } = useSession();
     const isAuthenticated = !!session?.user;
-    const hasTransferred = useRef(false);
+    const hasTransferred = useRef<string | null>(null);
+    const uploadInFlight = useRef(false);
     const searchParams = useSearchParams();
     const router = useRouter();
-    const [selectedPlan, setSelectedPlan] = useState<"Starter" | "Lite" | "Pro">("Starter");
+    const [selectedPlan, setSelectedPlan] = useState<
+        "Starter" | "Lite" | "Pro"
+    >("Starter");
 
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -44,10 +59,33 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [usageData, setUsageData] = useState<UsageData | null>(null);
 
+    const checkUsage = useCallback(async () => {
+        const response = await fetch("/api/usage");
+        if (!response.ok) {
+            throw new Error("Failed to check usage");
+        }
+        const data = await response.json();
+        setUsageData(data);
+        setAnalyticsPlan(data.plan as PlanType);
+        return data;
+    }, []);
+
+    const checkFreeUsage = useCallback(async () => {
+        const response = await fetch("/api/free-usage");
+        if (!response.ok) {
+            throw new Error("Failed to check free usage");
+        }
+        const data = await response.json();
+        setUsageData(data);
+        setAnalyticsPlan("Free");
+        return data;
+    }, []);
+
     useEffect(() => {
+        if (status === "loading") return;
         if (isAuthenticated) {
-            if (!hasTransferred.current) {
-                hasTransferred.current = true;
+            if (hasTransferred.current !== session?.user?.id) {
+                hasTransferred.current = session?.user?.id ?? null;
                 fetch("/api/transfer-usage", { method: "POST" })
                     .then(() => checkUsage())
                     .catch(console.error);
@@ -55,9 +93,16 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                 checkUsage()?.catch(console.error);
             }
         } else {
+            hasTransferred.current = null;
             checkFreeUsage().catch(console.error);
         }
-    }, [isAuthenticated]);
+    }, [
+        isAuthenticated,
+        status,
+        session?.user?.id,
+        checkUsage,
+        checkFreeUsage,
+    ]);
 
     useEffect(() => {
         const upgradePlan = searchParams.get("showUpgrade");
@@ -70,13 +115,15 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                     setUsageData(data);
                     const currentPlan = data?.plan || "Free";
                     if (currentPlan === "Free") {
-                        setSelectedPlan(upgradePlan as "Starter" | "Lite" | "Pro");
+                        setSelectedPlan(
+                            upgradePlan as "Starter" | "Lite" | "Pro",
+                        );
                         setShowPaymentModal(true);
                     }
                 })
                 .catch(console.error);
         }
-    }, [searchParams, isAuthenticated]);
+    }, [searchParams, isAuthenticated, router]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -88,155 +135,112 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
         setIsDragOver(false);
     }, []);
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
+    const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragOver(false);
 
         const files = Array.from(e.dataTransfer.files);
-        handleFiles(files);
-    }, []);
+        handleFiles(files, "drag_drop");
+    };
 
-    const handleFileSelect = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            const files = Array.from(e.target.files || []);
-            handleFiles(files);
-        },
-        []
-    );
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        handleFiles(files, "file_picker");
+    };
 
-    const getUploadAuthParams = async () => {
-        const response = await fetch("/api/upload-auth");
-
-        if (!response.ok) {
-            throw new Error("Failed to get upload auth params");
+    const getUploadAuthParams = async (): Promise<UploadAuthData | null> => {
+        const response = await fetch("/api/upload-auth", { method: "POST" });
+        const data = await response.json();
+        if (response.status === 403) {
+            trackEvent("image_upload_blocked", {
+                reason: isAuthenticated ? "upload_limit" : "free_upload_limit",
+                plan: data.plan || "Free",
+            });
+            setUsageData(data);
+            setShowPaymentModal(true);
+            return null;
         }
-        const data = await response?.json();
-
+        if (!response.ok) throw new Error("Failed to authorize upload");
+        setUsageData(data.usage);
+        setAnalyticsPlan(data.usage.plan as PlanType);
         return data;
     };
 
-    const uploadToImageKit = async (file: File): Promise<string> => {
+    const uploadToImageKit = async (
+        file: File,
+        auth: UploadAuthData,
+    ): Promise<string> => {
         try {
-            const { token, expire, signature, publicKey } =
-                await getUploadAuthParams();
-
+            const { token, expire, signature, publicKey } = auth;
             const result = await upload({
                 file,
-                fileName: file?.name,
+                fileName: file.name,
                 folder: "pixsuite-uploads",
                 expire,
                 token,
                 signature,
                 publicKey,
-                onProgress: (event) => {
-                    console.log(
-                        `Upload progress: ${(event.loaded / event.total) * 100
-                        }%`
-                    );
-                },
             });
-
-            return result.url || "";
+            if (!result.url) throw new Error("Upload returned no image URL");
+            return result.url;
         } catch (err) {
-            if (err instanceof ImageKitInvalidRequestError) {
+            if (err instanceof ImageKitInvalidRequestError)
                 throw new Error("Invalid upload request");
-            } else if (err instanceof ImageKitServerError) {
+            if (err instanceof ImageKitServerError)
                 throw new Error("ImageKit server error");
-            } else if (err instanceof ImageKitUploadNetworkError) {
+            if (err instanceof ImageKitUploadNetworkError)
                 throw new Error("Network error during upload");
-            } else {
-                throw new Error("Upload failed");
-            }
+            throw err;
         }
     };
 
-    const handleFiles = async (files: File[]) => {
+    const handleFiles = async (
+        files: File[],
+        source: "drag_drop" | "file_picker",
+    ) => {
+        if (uploadInFlight.current || status === "loading") return;
         const imageFile = files?.find((file) => file.type.startsWith("image/"));
         if (imageFile) {
+            const startedAt = performance.now();
+            let stage = "upload_authorization";
+            const properties = {
+                source,
+                file_type: imageFile.type,
+                size_bytes: imageFile.size,
+                is_authenticated: isAuthenticated,
+            };
+            trackEvent("image_upload_started", properties);
+            uploadInFlight.current = true;
             setIsUploading(true);
 
             try {
-                if (isAuthenticated) {
-                    const usage = await checkUsage();
-
-                    if (!usage.canUpload) {
-                        setShowPaymentModal(true);
-                        setIsUploading(false);
-                        return;
-                    }
-                    await updateUsage();
-                } else {
-                    const usage = await checkFreeUsage();
-
-                    if (!usage.canUpload) {
-                        setShowPaymentModal(true);
-                        setIsUploading(false);
-                        return;
-                    }
-                    await updateFreeUsage();
-                }
-
-                const imageUrl = await uploadToImageKit(imageFile);
+                const auth = await getUploadAuthParams();
+                if (!auth) return;
+                stage = "upload";
+                const imageUrl = await uploadToImageKit(imageFile, auth);
                 setUploadedImage(imageUrl);
                 onImageUpload(imageUrl);
+                trackEvent("image_upload_completed", {
+                    ...properties,
+                    duration_ms: Math.round(performance.now() - startedAt),
+                });
             } catch (err) {
+                trackEvent("image_upload_failed", {
+                    ...properties,
+                    stage,
+                    duration_ms: Math.round(performance.now() - startedAt),
+                });
                 console.error("Upload failed:", err);
             } finally {
+                uploadInFlight.current = false;
                 setIsUploading(false);
             }
+        } else if (files.length > 0) {
+            trackEvent("image_upload_blocked", {
+                reason: "unsupported_file_type",
+                source,
+            });
         }
-    };
-
-    const checkUsage = async () => {
-        const response = await fetch("/api/usage");
-        if (!response.ok) {
-            throw new Error("Failed to check usage");
-        }
-        const data = await response.json();
-        setUsageData(data);
-        return data;
-    };
-
-    const checkFreeUsage = async () => {
-        const response = await fetch("/api/free-usage");
-        if (!response.ok) {
-            throw new Error("Failed to check free usage");
-        }
-        const data = await response.json();
-        setUsageData(data);
-        return data;
-    };
-
-    const updateFreeUsage = async () => {
-        const response = await fetch("/api/free-usage", { method: "POST" });
-        if (!response.ok) {
-            const errorData = await response.json();
-            if (response.status === 403) {
-                setUsageData(errorData);
-                setShowPaymentModal(true);
-                throw new Error("Free usage limit reached");
-            }
-            throw new Error("Failed to update free usage");
-        }
-        const data = await response.json();
-        setUsageData(data);
-        return data;
-    };
-
-    const updateUsage = async () => {
-        const response = await fetch("/api/usage", { method: "POST" });
-        if (!response.ok) {
-            const errorData = await response.json();
-            if (response.status === 403) {
-                setUsageData(errorData);
-                setShowPaymentModal(true);
-                throw new Error("Upload limit reached");
-            }
-            throw new Error("Failed to update usage");
-        }
-        const data = await response.json();
-        setUsageData(data);
-        return data;
     };
 
     const handlePaymentModalClose = () => {
@@ -249,6 +253,7 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
     };
 
     const clearImage = () => {
+        trackEvent("image_cleared");
         setUploadedImage(null);
         onImageUpload("");
     };
@@ -276,7 +281,7 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                             stiffness: 300,
                             damping: 25,
                         }}
-                        className="relative group rounded-xl overflow-hidden border border-border"
+                        className="ph-no-capture relative group rounded-xl overflow-hidden border border-border"
                     >
                         <button
                             onClick={clearImage}
@@ -317,10 +322,11 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={handleDrop}
-                            className={`relative rounded-xl p-5 border-2 border-dashed transition-all duration-300 cursor-pointer ${isDragOver
-                                ? "border-primary bg-primary/5 scale-[1.02]"
-                                : "border-border hover:border-primary/40 hover:bg-muted/30"
-                                }`}
+                            className={`relative rounded-xl p-5 border-2 border-dashed transition-all duration-300 cursor-pointer ${
+                                isDragOver
+                                    ? "border-primary bg-primary/5 scale-[1.02]"
+                                    : "border-border hover:border-primary/40 hover:bg-muted/30"
+                            }`}
                         >
                             {/* Animated gradient border on drag */}
                             {isDragOver && (
@@ -375,8 +381,8 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                                     {isUploading
                                         ? "Uploading..."
                                         : isDragOver
-                                            ? "Drop it!"
-                                            : "Upload Photo"}
+                                          ? "Drop it!"
+                                          : "Upload Photo"}
                                 </h3>
 
                                 <p className="text-[11px] text-muted-foreground mb-3">
@@ -428,7 +434,8 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                         <div className="flex items-center gap-1.5 text-muted-foreground">
                             <Upload className="h-2.5 w-2.5" />
                             <span>
-                                {usageData.uploadCount}/{usageData.uploadLimit} uploads
+                                {usageData.uploadCount}/{usageData.uploadLimit}{" "}
+                                uploads
                             </span>
                             {usageData.plan !== "Free" && (
                                 <Badge
@@ -451,7 +458,9 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                         <motion.div
                             className="h-full bg-primary rounded-full"
                             initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(uploadPercent, 100)}%` }}
+                            animate={{
+                                width: `${Math.min(uploadPercent, 100)}%`,
+                            }}
                             transition={{ duration: 0.6, ease: "easeOut" }}
                         />
                     </div>
@@ -462,7 +471,12 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                                 <Zap className="h-2.5 w-2.5 text-primary" />
                                 <span>
-                                    {(updatedCreditsRemaining ?? usageData.creditsRemaining)?.toLocaleString()}/{usageData.creditLimit?.toLocaleString()} credits
+                                    {(
+                                        updatedCreditsRemaining ??
+                                        usageData.creditsRemaining
+                                    )?.toLocaleString()}
+                                    /{usageData.creditLimit?.toLocaleString()}{" "}
+                                    credits
                                 </span>
                             </div>
                         </div>
@@ -484,7 +498,9 @@ export default function UploadZone({ onImageUpload, updatedCreditsRemaining }: U
                         checkUsage().catch(console.error);
                     }
                 }}
-                creditsRemaining={updatedCreditsRemaining ?? usageData?.creditsRemaining ?? 0}
+                creditsRemaining={
+                    updatedCreditsRemaining ?? usageData?.creditsRemaining ?? 0
+                }
                 creditLimit={usageData?.creditLimit ?? 0}
                 uploadCount={usageData?.uploadCount ?? 0}
                 uploadLimit={usageData?.uploadLimit ?? 3}

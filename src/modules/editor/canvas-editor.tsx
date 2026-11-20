@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Eye, EyeOff, Loader2, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
 
 interface CanvasEditorProps {
     originalImage: string | null;
@@ -89,7 +90,7 @@ export default function CanvasEditor({
             {/* Canvas Container */}
             <motion.div
                 layout
-                className="relative editor-panel overflow-hidden aspect-4/3"
+                className="ph-no-capture relative editor-panel overflow-hidden aspect-4/3"
             >
                 {/* Processing Overlay */}
                 <AnimatePresence>
@@ -214,9 +215,7 @@ export default function CanvasEditor({
                         >
                             <img
                                 src={processedImage || originalImage}
-                                alt={
-                                    processedImage ? "Processed" : "Original"
-                                }
+                                alt={processedImage ? "Processed" : "Original"}
                                 className="w-full h-full object-contain"
                                 loading="eager"
                             />
@@ -236,9 +235,12 @@ export default function CanvasEditor({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() =>
-                                    setShowComparison(!showComparison)
-                                }
+                                onClick={() => {
+                                    trackEvent("editor_comparison_toggled", {
+                                        enabled: !showComparison,
+                                    });
+                                    setShowComparison(!showComparison);
+                                }}
                                 className="glass bg-background/40 border-foreground/10 text-foreground hover:bg-background/60 backdrop-blur-xl gap-1.5 text-xs cursor-pointer"
                             >
                                 {showComparison ? (
@@ -259,10 +261,7 @@ export default function CanvasEditor({
             </motion.div>
 
             {/* Status Strip */}
-            <motion.div
-                layout
-                className="text-center py-1"
-            >
+            <motion.div layout className="text-center py-1">
                 <AnimatePresence mode="wait">
                     {isProcessing ? (
                         <motion.p
