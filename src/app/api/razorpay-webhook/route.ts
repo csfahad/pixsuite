@@ -1,217 +1,71 @@
-import crypto from "crypto";
-import Razorpay from "razorpay";
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUpgradedUsage, PLAN_UPLOAD_LIMITS, type PlanType } from "@/lib/plans";
-
-const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET!;
-
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID!,
-    key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+import { after, NextRequest, NextResponse } from "next/server";
+import {
+    activatePayment,
+    paymentSchema,
+    validPaymentSignature,
+} from "@/lib/payment-activation.server";
+import { razorpayClient } from "@/lib/razorpay.server";
+import { RequestError, requestErrorResponse } from "@/lib/request-error.server";
+import { trackPaymentOutcome } from "@/lib/payment-analytics.server";
+import {
+    failedPaymentSchema,
+    recordPaymentFailure,
+} from "@/lib/payment-failure.server";
 
 export async function POST(request: NextRequest) {
     try {
+        const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        if (!secret) throw new RequestError(503, "Webhook is unavailable");
         const body = await request.text();
         const signature = request.headers.get("x-razorpay-signature");
-
-        if (!signature) {
-            return NextResponse.json(
-                { error: "Missing signature" },
-                { status: 400 }
-            );
+        if (!signature || !validPaymentSignature(body, signature, secret))
+            throw new RequestError(400, "Invalid signature");
+        let event;
+        try {
+            event = JSON.parse(body);
+        } catch {
+            throw new RequestError(400, "Invalid webhook payload");
         }
-
-        // verify webhook signature
-        const expectedSignature = crypto
-            .createHmac("sha256", WEBHOOK_SECRET)
-            .update(body)
-            .digest("hex");
-
-        if (signature !== expectedSignature) {
-            console.error("Webhook signature verification failed");
-            return NextResponse.json(
-                { error: "Invalid signature" },
-                { status: 400 }
-            );
-        }
-
-        const event = JSON.parse(body);
-
-        // handle payment.captured event
-        if (event.event === "payment.captured") {
-            const payment = event.payload.payment.entity;
-            const orderId = payment.order_id;
-            const paymentId = payment.id;
-
-            try {
-                const order = await razorpay.orders.fetch(orderId);
-                const userId = order.notes?.userId;
-                const planType = (order.notes?.plan || "Starter") as "Starter" | "Lite" | "Pro";
-                const fromPlan = (order.notes?.fromPlan || "Free") as PlanType;
-
-                if (!userId) {
-                    console.error("User ID not found in order notes");
-                    return NextResponse.json(
-                        { error: "User ID not found" },
-                        { status: 400 }
-                    );
-                }
-
-                const userIdString = String(userId);
-
-                const user = await prisma.users.findUnique({
-                    where: { id: userIdString },
-                });
-
-                if (!user) {
-                    console.error("User not found:", userIdString);
-                    return NextResponse.json(
-                        { error: "User not found" },
-                        { status: 404 }
-                    );
-                }
-
-                // compute new credits and upload limits
-                const { creditsUsed, creditLimit, uploadCount, uploadLimit } =
-                    getUpgradedUsage(fromPlan, planType);
-
-                // calculate expiration date (1 month from now)
-                const subscriptionExpiresAt = new Date();
-                subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1);
-
-                // update user plan, credits, uploads, and expiration
-                await prisma.users.update({
-                    where: { id: user.id },
-                    data: {
-                        plan: planType,
-                        creditsUsed,
-                        creditLimit,
-                        uploadCount,
-                        uploadLimit,
-                        usageCount: uploadCount,
-                        usageLimit: uploadLimit,
-                        razorpayCustomerId: paymentId,
-                        subscriptionExpiresAt: subscriptionExpiresAt,
-                    },
-                });
-
-                // create or update subscription record
-                const existingSubscription = await prisma.subscriptions.findFirst({
-                    where: { userId: user.id },
-                });
-
-                if (existingSubscription) {
-                    await prisma.subscriptions.update({
-                        where: { id: existingSubscription.id },
-                        data: {
-                            plan: planType,
-                            razorpaySubscriptionId: orderId,
-                            razorpayCustomerId: paymentId,
-                            expiresAt: subscriptionExpiresAt,
-                            updatedAt: new Date(),
-                        },
-                    });
-                } else {
-                    await prisma.subscriptions.create({
-                        data: {
-                            userId: user.id,
-                            plan: planType,
-                            razorpaySubscriptionId: orderId,
-                            razorpayCustomerId: paymentId,
-                            expiresAt: subscriptionExpiresAt,
-                        },
-                    });
-                }
-
-                console.log(`Payment captured and ${planType} Plan activated for user: ${userIdString}`);
-                return NextResponse.json({ success: true });
-            } catch (err: any) {
-                console.error("Error processing payment.captured event:", err);
-                return NextResponse.json(
-                    { error: "Error processing webhook", details: err.message },
-                    { status: 500 }
-                );
-            }
-        }
-
-        // handle payment.failed event
+        if (!event || typeof event.event !== "string")
+            throw new RequestError(400, "Invalid webhook event");
         if (event.event === "payment.failed") {
-            try {
-                const paymentEntity = event.payload?.payment?.entity;
-                if (!paymentEntity) {
-                    return NextResponse.json(
-                        { error: "Invalid payment.failed payload" },
-                        { status: 400 }
-                    );
-                }
-
-                const orderId = paymentEntity.order_id;
-                const paymentId = paymentEntity.id;
-
-                const subscription = await prisma.subscriptions.findFirst({
-                    where: { razorpaySubscriptionId: orderId },
-                });
-
-                let user = null;
-                if (subscription) {
-                    user = await prisma.users.findUnique({
-                        where: { id: subscription.userId },
-                    });
-                }
-
-                if (subscription && user) {
-                    await prisma.subscriptions.update({
-                        where: { id: subscription.id },
-                        data: {
-                            updatedAt: new Date(),
-                        },
-                    });
-
-                    await prisma.users.update({
-                        where: { id: user.id },
-                        data: {
-                            plan: "Free",
-                            creditLimit: 0,
-                            creditsUsed: 0,
-                            uploadLimit: PLAN_UPLOAD_LIMITS.Free,
-                            uploadCount: 0,
-                            usageLimit: PLAN_UPLOAD_LIMITS.Free,
-                        },
-                    });
-
-                    console.log(
-                        `Payment failed for user ${user.id}, order ${orderId}, payment ${paymentId}`
-                    );
-                } else {
-                    console.warn(
-                        `No subscription/user found for failed payment. order: ${orderId}, payment: ${paymentId}`
-                    );
-                }
-
-                return NextResponse.json({ success: true });
-            } catch (err: any) {
-                console.error("Error processing payment.failed event:", err);
-                return NextResponse.json(
-                    { error: "Error handling payment.failed event", details: err.message },
-                    { status: 500 }
+            const parsed = failedPaymentSchema.safeParse(
+                event.payload?.payment?.entity,
+            );
+            if (!parsed.success)
+                throw new RequestError(400, "Invalid failed payment");
+            const payment = parsed.data;
+            const order = await razorpayClient().orders.fetch(payment.order_id);
+            const result = await recordPaymentFailure(order, payment);
+            if (result.recorded)
+                after(() =>
+                    trackPaymentOutcome(order, "failed", payment.error_code),
                 );
-            }
+            return NextResponse.json({ success: true });
         }
-
-        console.log(`Received webhook event: ${event.event}`);
-        return NextResponse.json({ received: true });
-    } catch (err: any) {
-        console.error("Webhook error:", err);
-        return NextResponse.json(
-            { error: "Webhook processing failed", details: err.message },
-            { status: 500 }
+        if (event.event !== "payment.captured")
+            return NextResponse.json({ received: true });
+        const parsed = paymentSchema.safeParse(event.payload?.payment?.entity);
+        if (!parsed.success)
+            throw new RequestError(400, "Invalid captured payment");
+        const payment = parsed.data;
+        const order = await razorpayClient().orders.fetch(payment.order_id);
+        // The signed webhook is the capture authority; this fetch supplies order metadata only.
+        const result = await activatePayment(order, payment, {
+            source: "webhook",
+        });
+        if (result.activated)
+            after(() => trackPaymentOutcome(order, "captured"));
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        // Provider/database failures remain non-2xx so Razorpay retries delivery.
+        return requestErrorResponse(
+            error,
+            "Razorpay webhook processing failed:",
         );
     }
 }
 
-// webhooks GET requests (for ping from razorpay)
 export async function GET() {
     return NextResponse.json({ status: "Webhook endpoint is active" });
 }
