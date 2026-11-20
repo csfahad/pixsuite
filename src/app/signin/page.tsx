@@ -1,14 +1,16 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { motion } from "motion/react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { WandSparkles, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { BrandMark } from "@/components/brand/logo";
 
 export default function SignInPage() {
-    const { data: session, status } = useSession();
+    const { status } = useSession();
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
@@ -23,9 +25,13 @@ export default function SignInPage() {
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                        duration: 1.2,
+                        repeat: Infinity,
+                        ease: "linear",
+                    }}
                 >
-                    <WandSparkles className="h-8 w-8 text-primary" />
+                    <Loader2 className="h-8 w-8 text-primary" />
                 </motion.div>
             </div>
         );
@@ -45,19 +51,31 @@ export default function SignInPage() {
                 className="absolute top-16 -left-20 w-[420px] h-[420px] rounded-full blur-[100px] opacity-30"
                 style={{ background: "oklch(0.65 0.25 265)" }}
                 animate={{ y: [0, 30, 0], x: [0, 15, 0] }}
-                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                    duration: 8,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
             />
             <motion.div
                 className="absolute -bottom-10 right-0 w-[340px] h-[340px] rounded-full blur-[100px] opacity-25"
                 style={{ background: "oklch(0.72 0.19 150)" }}
                 animate={{ y: [0, -25, 0], x: [0, -20, 0] }}
-                transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                    duration: 10,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
             />
             <motion.div
                 className="absolute top-1/3 right-1/4 w-[200px] h-[200px] rounded-full blur-[80px] opacity-20"
                 style={{ background: "oklch(0.75 0.15 30)" }}
                 animate={{ y: [0, -15, 0], x: [0, 10, 0] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                    duration: 6,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
             />
 
             {/* Grid pattern overlay */}
@@ -92,17 +110,16 @@ export default function SignInPage() {
                             transition={{ delay: 0.15 }}
                             className="flex flex-col items-center mb-8"
                         >
-                            <div className="relative mb-4">
-                                <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20">
-                                    <WandSparkles className="h-7 w-7 text-primary" />
-                                </div>
-                                <div className="absolute -inset-1 rounded-2xl bg-primary/10 blur-lg opacity-50 animate-pulse" />
-                            </div>
+                            <BrandMark
+                                className="mb-4 h-14 w-14 text-foreground"
+                                aria-hidden="true"
+                            />
                             <h1 className="text-2xl font-bold tracking-tight text-foreground">
                                 Welcome to PixSuite
                             </h1>
                             <p className="mt-2 text-sm text-muted-foreground text-center max-w-xs">
-                                Sign in to unlock AI-powered photo editing, background removal, and more.
+                                Sign in to unlock AI-powered photo editing,
+                                background removal, and more.
                             </p>
                         </motion.div>
 
@@ -116,6 +133,10 @@ export default function SignInPage() {
                             disabled={loading}
                             onClick={() => {
                                 if (loading) return;
+                                trackEvent("sign_in_started", {
+                                    provider: "google",
+                                    source: "signin_page",
+                                });
                                 setLoading(true);
                                 signIn("google", { callbackUrl: "/" });
                             }}
@@ -147,7 +168,11 @@ export default function SignInPage() {
                                     />
                                 </svg>
                             )}
-                            <span>{loading ? "Redirecting…" : "Continue with Google"}</span>
+                            <span>
+                                {loading
+                                    ? "Redirecting…"
+                                    : "Continue with Google"}
+                            </span>
                             {!loading && (
                                 <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200" />
                             )}
