@@ -1,119 +1,24 @@
-import { cookies, headers } from "next/headers";
-import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-
-const COOKIE_NAME = "pixsuite-anon";
-
-async function getClientIp(): Promise<string | null> {
-    const headerStore = await headers();
-    const forwarded = headerStore.get("x-forwarded-for");
-    if (forwarded) {
-        return forwarded.split(",")[0].trim();
-    }
-    return headerStore.get("x-real-ip") ?? null;
-}
+import { requestUserId } from "@/lib/request-user.server";
+import { anonymousSession } from "@/lib/anonymous-session.server";
+import { currentUserUsage, synchronizeFreeTrial } from "@/lib/usage.server";
+import { requestErrorResponse } from "@/lib/request-error.server";
 
 export async function POST(request: NextRequest) {
     try {
-        const token = await getToken({ req: request });
-
-        if (!token?.email) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
-            );
-        }
-
-        const cookieStore = await cookies();
-        const sessionId = cookieStore.get(COOKIE_NAME)?.value;
-        const clientIp = await getClientIp();
-
-        // try cookie-based lookup first, then fall back to IP
-        let anonSession = null;
-
-        if (sessionId) {
-            anonSession = await prisma.anonymous_sessions.findUnique({
-                where: { sessionId },
-            });
-        }
-
-        // if no cookie match, try IP-based lookup for exhausted sessions
-        if (!anonSession && clientIp) {
-            anonSession = await prisma.anonymous_sessions.findFirst({
-                where: {
-                    ipAddress: clientIp,
-                    usageCount: { gte: 3 },
-                },
-                orderBy: { updatedAt: "desc" },
-            });
-        }
-
-        if (!anonSession) {
-            const response = NextResponse.json({
-                transferred: false,
-                message: "No anonymous session found",
-            });
-            return response;
-        }
-
-        const user = await prisma.users.findUnique({
-            where: { email: token.email as string },
-        });
-
-        if (!user) {
-            return NextResponse.json(
-                { error: "User not found" },
-                { status: 404 }
-            );
-        }
-
-        // skip transfer for paid users — their usage was reset at subscription time
-        const isSubscriptionActive = user.subscriptionExpiresAt
-            ? new Date(user.subscriptionExpiresAt) > new Date()
-            : false;
-
-        if (user.plan !== "Free" && isSubscriptionActive) {
-            // clean up: delete the anonymous session so it never interferes again
-            await prisma.anonymous_sessions.delete({
-                where: { id: anonSession.id },
-            });
-            return NextResponse.json({
-                transferred: false,
-                message: "Paid user — anonymous session cleaned up",
-            });
-        }
-
-        // transfer: use the higher of the two upload counts
-        const newUploadCount = Math.max(user.uploadCount, anonSession.usageCount);
-
-        await prisma.users.update({
-            where: { id: user.id },
-            data: {
-                uploadCount: newUploadCount,
-                usageCount: newUploadCount,
-            },
-        });
-
-        await prisma.anonymous_sessions.update({
-            where: { id: anonSession.id },
-            data: {
-                usageCount: newUploadCount,
-                ipAddress: clientIp ?? anonSession.ipAddress,
-            },
-        });
-
-        const response = NextResponse.json({
-            transferred: true,
-            uploadCount: newUploadCount,
-        });
-
-        return response;
-    } catch (err) {
-        console.error("Transfer usage error:", err);
+        const userId = await requestUserId(request);
+        const user = await currentUserUsage(userId);
+        // Keep the anonymous budget when a paid user signs in or out.
+        if (user.plan !== "Free")
+            return NextResponse.json({ transferred: false });
+        const session = await anonymousSession(request);
+        const result = await synchronizeFreeTrial(userId, session.id);
         return NextResponse.json(
-            { error: "Internal server error" },
-            { status: 500 }
+            result
+                ? { transferred: true, uploadCount: result.usage.uploadCount }
+                : { transferred: false },
         );
+    } catch (error) {
+        return requestErrorResponse(error, "Usage transfer failed:");
     }
 }
