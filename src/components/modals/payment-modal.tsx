@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, Crown, LogIn, Rocket, Star, X, Zap } from "lucide-react";
+import { Check, Crown, LogIn, Rocket, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
 import {
     getUpgradePriceDisplay,
     PLAN_CREDIT_LIMITS,
@@ -13,8 +14,16 @@ import {
 
 declare global {
     interface Window {
-        Razorpay: any;
+        Razorpay: new (options: Record<string, unknown>) => {
+            open: () => void;
+        };
     }
+}
+
+interface CheckoutResponse {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
 }
 
 interface PaymentModalProps {
@@ -38,30 +47,61 @@ const planIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 
 const planFeatures: Record<string, { title: string; description: string }[]> = {
     Starter: [
-        { title: `${PLAN_CREDIT_LIMITS.Starter.toLocaleString()} AI Credits/mo`, description: "Use any AI tool — pay per feature" },
-        { title: `${PLAN_UPLOAD_LIMITS.Starter.toLocaleString()} Uploads/mo`, description: "More than enough for casual use" },
-        { title: "All Basic AI Features", description: "Background removal, upscale, retouch, and more" },
+        {
+            title: `${PLAN_CREDIT_LIMITS.Starter.toLocaleString()} AI Credits/mo`,
+            description: "Use any AI tool — pay per feature",
+        },
+        {
+            title: `${PLAN_UPLOAD_LIMITS.Starter.toLocaleString()} Uploads/mo`,
+            description: "More than enough for casual use",
+        },
+        {
+            title: "All Basic AI Features",
+            description: "Background removal, upscale, retouch, and more",
+        },
     ],
     Lite: [
-        { title: `${PLAN_CREDIT_LIMITS.Lite.toLocaleString()} AI Credits/mo`, description: "Enough for frequent editing" },
-        { title: `${PLAN_UPLOAD_LIMITS.Lite.toLocaleString()} Uploads/mo`, description: "Handle high-volume workloads" },
-        { title: "All AI Features Unlocked", description: "Including Pro BG removal (e-removedotbg)" },
-        { title: "Priority Processing", description: "Faster AI processing for your edits" },
+        {
+            title: `${PLAN_CREDIT_LIMITS.Lite.toLocaleString()} AI Credits/mo`,
+            description: "Enough for frequent editing",
+        },
+        {
+            title: `${PLAN_UPLOAD_LIMITS.Lite.toLocaleString()} Uploads/mo`,
+            description: "Handle high-volume workloads",
+        },
+        {
+            title: "All AI Features Unlocked",
+            description: "Including Pro BG removal (e-removedotbg)",
+        },
+        {
+            title: "Priority Processing",
+            description: "Faster AI processing for your edits",
+        },
     ],
     Pro: [
-        { title: `${PLAN_CREDIT_LIMITS.Pro.toLocaleString()} AI Credits/mo`, description: "Maximum credits for power users" },
-        { title: `${PLAN_UPLOAD_LIMITS.Pro.toLocaleString()} Uploads/mo`, description: "Handle enterprise volumes" },
-        { title: "Fastest Processing", description: "Top priority in processing queue" },
-        { title: "API Access + Priority Support", description: "For professional workflows" },
+        {
+            title: `${PLAN_CREDIT_LIMITS.Pro.toLocaleString()} AI Credits/mo`,
+            description: "Maximum credits for power users",
+        },
+        {
+            title: `${PLAN_UPLOAD_LIMITS.Pro.toLocaleString()} Uploads/mo`,
+            description: "Handle enterprise volumes",
+        },
+        {
+            title: "Fastest Processing",
+            description: "Top priority in processing queue",
+        },
+        {
+            title: "API Access + Priority Support",
+            description: "For professional workflows",
+        },
     ],
 };
 
 export default function PaymentModal({
     isOpen,
     onClose,
-    onUpgrade,
     creditsRemaining,
-    creditLimit,
     uploadCount,
     uploadLimit,
     plan = "Starter",
@@ -70,6 +110,18 @@ export default function PaymentModal({
 }: PaymentModalProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const viewedModal = useRef(false);
+
+    useEffect(() => {
+        if (isOpen && !viewedModal.current) {
+            trackEvent("upgrade_modal_viewed", {
+                selected_plan: plan,
+                current_plan: currentPlan,
+                is_authenticated: isAuthenticated,
+            });
+        }
+        viewedModal.current = isOpen;
+    }, [isOpen, plan, currentPlan, isAuthenticated]);
 
     useEffect(() => {
         setMounted(true);
@@ -90,7 +142,12 @@ export default function PaymentModal({
     }, [isOpen]);
 
     const handleUpgrade = async () => {
+        trackEvent("checkout_started", {
+            selected_plan: plan,
+            current_plan: currentPlan,
+        });
         setIsLoading(true);
+        let stage = "order_creation";
         try {
             // create razorpay order with plan type
             const response = await fetch("/api/create-razorpay-order", {
@@ -120,6 +177,7 @@ export default function PaymentModal({
             }
 
             // open razorpay checkout
+            stage = "checkout_initialization";
             const options = {
                 key: key,
                 amount: amount,
@@ -127,9 +185,20 @@ export default function PaymentModal({
                 name: "PixSuite",
                 description: `${plan} Plan Subscription`,
                 order_id: orderId,
-                handler: async function (response: any) {
+                handler: async function (response: CheckoutResponse) {
+                    trackEvent("checkout_submitted", {
+                        selected_plan: plan,
+                        currency,
+                        amount_paise: amount,
+                    });
+                    // Production waits for the signed webhook. Checkout success grants no entitlement.
+                    if (process.env.NODE_ENV !== "development") {
+                        sessionStorage.setItem("pixsuite_payment", "pending");
+                        window.location.href = "/?payment_pending=true";
+                        return;
+                    }
                     try {
-                        // verify payment on server
+                        // Local development may test capture through the development-only endpoint.
                         const verifyResponse = await fetch(
                             "/api/verify-razorpay-payment",
                             {
@@ -148,19 +217,41 @@ export default function PaymentModal({
                             },
                         );
 
+                        const result = await verifyResponse.json();
+                        if (result.pending) {
+                            sessionStorage.setItem(
+                                "pixsuite_payment",
+                                "pending",
+                            );
+                            window.location.href = "/?payment_pending=true";
+                            return;
+                        }
                         if (!verifyResponse.ok) {
                             throw new Error("Payment verification failed");
                         }
 
-                        const result = await verifyResponse.json();
-
                         if (result.success) {
-                            sessionStorage.setItem("pixsuite_payment", "upgraded");
+                            if (result.activated)
+                                trackEvent("checkout_completed", {
+                                    selected_plan: plan,
+                                    previous_plan: currentPlan,
+                                    currency,
+                                    amount_paise: amount,
+                                    source: "development",
+                                });
+                            sessionStorage.setItem(
+                                "pixsuite_payment",
+                                "upgraded",
+                            );
                             window.location.href = `/?upgraded=${plan}`;
                         } else {
                             throw new Error("Payment verification failed");
                         }
                     } catch (err) {
+                        trackEvent("checkout_failed", {
+                            selected_plan: plan,
+                            stage: "payment_verification",
+                        });
                         sessionStorage.setItem("pixsuite_payment", "failed");
                         window.location.href = "/?payment_failed=true";
                         console.error("Payment verification error:", err);
@@ -173,6 +264,9 @@ export default function PaymentModal({
                 },
                 modal: {
                     ondismiss: function () {
+                        trackEvent("checkout_cancelled", {
+                            selected_plan: plan,
+                        });
                         setIsLoading(false);
                         sessionStorage.setItem("pixsuite_payment", "cancelled");
                         window.location.href = "/?payment_cancelled=true";
@@ -183,9 +277,19 @@ export default function PaymentModal({
             const razorpay = new window.Razorpay(options);
             onClose();
             razorpay.open();
-        } catch (err: any) {
+            trackEvent("checkout_opened", {
+                selected_plan: plan,
+                currency,
+                amount_paise: amount,
+            });
+        } catch (err) {
+            trackEvent("checkout_failed", { selected_plan: plan, stage });
             console.error("Upgrade failed:", err);
-            alert(err.message || "Failed to start checkout. Please try again.");
+            alert(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to start checkout. Please try again.",
+            );
             setIsLoading(false);
         }
     };
@@ -238,7 +342,10 @@ export default function PaymentModal({
                         {/* Features */}
                         <div className="space-y-4 mb-6">
                             {features.map((feature, i) => (
-                                <div key={i} className="flex items-center space-x-3">
+                                <div
+                                    key={i}
+                                    className="flex items-center space-x-3"
+                                >
                                     <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center shrink-0">
                                         <Check className="h-4 w-4 text-primary" />
                                     </div>
@@ -298,7 +405,16 @@ export default function PaymentModal({
                                 </Button>
                             ) : (
                                 <Button
-                                    onClick={() => signIn("google", { callbackUrl: `/editor?showUpgrade=${plan}` })}
+                                    onClick={() => {
+                                        trackEvent("sign_in_started", {
+                                            provider: "google",
+                                            source: "upgrade_modal",
+                                            selected_plan: plan,
+                                        });
+                                        signIn("google", {
+                                            callbackUrl: `/editor?showUpgrade=${plan}`,
+                                        });
+                                    }}
                                     className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary transition-all cursor-pointer"
                                 >
                                     <LogIn className="h-4 w-4 mr-2" />
