@@ -1,7 +1,8 @@
 "use client";
 import { motion } from "motion/react";
-import { Heart, WandSparkles } from "lucide-react";
+import { Heart } from "lucide-react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand/logo";
 
 export default function Footer() {
     return (
@@ -19,19 +20,26 @@ export default function Footer() {
                     className="text-center"
                 >
                     {/* Logo */}
-                    <div className="flex items-center justify-center space-x-2 mb-6">
-                        <div className="relative">
-                            <WandSparkles className="h-6 w-6 md:h-8 md:w-8 text-primary animate-glow-pulse" />
-                            <div className="absolute inset-0 h-8 w-8 text-secondary animate-glow-pulse opacity-50" />
-                        </div>
-                        <span className="text-2xl md:text-3xl font-bold bg-primary bg-clip-text! text-transparent">
-                            PixSuite
-                        </span>
+                    <div className="flex justify-center mb-6">
+                        <Link
+                            href="/"
+                            aria-label="PixSuite home"
+                            className="brand-home-link inline-flex min-h-11 items-center rounded-sm text-foreground outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                            <BrandLogo
+                                className="h-9 w-auto"
+                                aria-hidden="true"
+                            />
+                        </Link>
                     </div>
 
                     <p className="text-muted-foreground mb-8 max-w-2xl mx-auto text-sm md:text-base">
-                        Unleash the magic of AI to effortlessly elevate your photos. Instantly remove backgrounds, sharpen every detail, and create breathtaking images
-                        <span className="flex items-center justify-center">—&nbsp;just a click away.</span>
+                        Unleash the magic of AI to effortlessly elevate your
+                        photos. Instantly remove backgrounds, sharpen every
+                        detail, and create breathtaking images
+                        <span className="flex items-center justify-center">
+                            —&nbsp;just a click away.
+                        </span>
                     </p>
 
                     <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
@@ -50,7 +58,8 @@ export default function Footer() {
                                     <div
                                         className="h-px"
                                         style={{
-                                            background: "linear-gradient(90deg, transparent 0%, #A3A3A3 20%, #A3A3A3 80%, transparent 100%)",
+                                            background:
+                                                "linear-gradient(90deg, transparent 0%, #A3A3A3 20%, #A3A3A3 80%, transparent 100%)",
                                             opacity: 0.35,
                                             filter: "blur(1.5px)",
                                         }}
@@ -60,12 +69,23 @@ export default function Footer() {
                         </div>
                         <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 mt-2 text-sm text-muted-foreground relative z-10">
                             <p className="text-sm text-muted-foreground text-center relative z-10">
-                                © {new Date().getFullYear()} PixSuite. All rights reserved.
+                                © {new Date().getFullYear()} PixSuite. All
+                                rights reserved.
                             </p>
                             <div className="flex items-center space-x-4">
-                                <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
+                                <Link
+                                    href="/terms"
+                                    className="hover:text-primary transition-colors"
+                                >
+                                    Terms of Service
+                                </Link>
                                 <span>•</span>
-                                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+                                <Link
+                                    href="/privacy"
+                                    className="hover:text-primary transition-colors"
+                                >
+                                    Privacy Policy
+                                </Link>
                             </div>
                         </div>
                     </div>
