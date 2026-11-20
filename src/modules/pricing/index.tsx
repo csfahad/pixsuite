@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { GlowingEffect } from "@/components/ui/glowing-effect";
 import PaymentModal from "@/components/modals/payment-modal";
 import { getUpgradePriceDisplayUSD, type PlanType } from "@/lib/plans";
+import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
 
 const plans = [
     {
@@ -85,7 +86,9 @@ export default function Pricing() {
     const { data: session } = useSession();
     const isAuthenticated = !!session?.user;
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<"Starter" | "Lite" | "Pro">("Starter");
+    const [selectedPlan, setSelectedPlan] = useState<
+        "Starter" | "Lite" | "Pro"
+    >("Starter");
     const [usageData, setUsageData] = useState<{
         creditsUsed: number;
         creditLimit: number;
@@ -110,6 +113,7 @@ export default function Pricing() {
             if (response.ok) {
                 const data = await response.json();
                 setUsageData(data);
+                setAnalyticsPlan((data.plan || "Free") as PlanType);
                 return data;
             }
         } catch (err) {
@@ -122,13 +126,25 @@ export default function Pricing() {
     };
 
     const handlePlanClick = (planName: string) => {
+        trackEvent("plan_selected", {
+            selected_plan: planName,
+            current_plan: usageData?.plan || "Free",
+            is_authenticated: isAuthenticated,
+        });
         if (planName === "Free") {
             navigateToEditor();
             return;
         }
 
         if (!isAuthenticated) {
-            signIn("google", { callbackUrl: `/editor?showUpgrade=${planName}` });
+            trackEvent("sign_in_started", {
+                provider: "google",
+                source: "pricing",
+                selected_plan: planName,
+            });
+            signIn("google", {
+                callbackUrl: `/editor?showUpgrade=${planName}`,
+            });
             return;
         }
 
@@ -157,7 +173,10 @@ export default function Pricing() {
         const isSubscriptionActive = usageData.subscriptionExpiresAt
             ? new Date(usageData.subscriptionExpiresAt) > new Date()
             : false;
-        return currentPlan === planName && (planName === "Free" || isSubscriptionActive);
+        return (
+            currentPlan === planName &&
+            (planName === "Free" || isSubscriptionActive)
+        );
     };
 
     const canUpgradeToPlan = (planName: string) => {
@@ -172,8 +191,16 @@ export default function Pricing() {
         }
 
         // plan hierarchy
-        const planRank: Record<string, number> = { Free: 0, Starter: 1, Lite: 2, Pro: 3 };
-        if ((planRank[currentPlan] || 0) >= (planRank[planName] || 0) && isSubscriptionActive) {
+        const planRank: Record<string, number> = {
+            Free: 0,
+            Starter: 1,
+            Lite: 2,
+            Pro: 3,
+        };
+        if (
+            (planRank[currentPlan] || 0) >= (planRank[planName] || 0) &&
+            isSubscriptionActive
+        ) {
             return false;
         }
 
@@ -185,7 +212,7 @@ export default function Pricing() {
         checkUsage().catch(console.error);
     };
 
-    const getDisplayPrice = (plan: typeof plans[0]) => {
+    const getDisplayPrice = (plan: (typeof plans)[0]) => {
         if (plan.name === "Free") return plan.price;
 
         const currentPlan = (usageData?.plan as PlanType) || "Free";
@@ -194,8 +221,17 @@ export default function Pricing() {
             : false;
 
         // show pro-rata price if upgrading from a paid plan
-        if (isSubscriptionActive && currentPlan !== "Free" && currentPlan !== plan.name) {
-            const planRank: Record<string, number> = { Free: 0, Starter: 1, Lite: 2, Pro: 3 };
+        if (
+            isSubscriptionActive &&
+            currentPlan !== "Free" &&
+            currentPlan !== plan.name
+        ) {
+            const planRank: Record<string, number> = {
+                Free: 0,
+                Starter: 1,
+                Lite: 2,
+                Pro: 3,
+            };
             if ((planRank[plan.name] || 0) > (planRank[currentPlan] || 0)) {
                 return `$${getUpgradePriceDisplayUSD(currentPlan, plan.name as "Starter" | "Lite" | "Pro")}`;
             }
@@ -212,7 +248,12 @@ export default function Pricing() {
 
         if (!isSubscriptionActive || currentPlan === "Free") return false;
 
-        const planRank: Record<string, number> = { Free: 0, Starter: 1, Lite: 2, Pro: 3 };
+        const planRank: Record<string, number> = {
+            Free: 0,
+            Starter: 1,
+            Lite: 2,
+            Pro: 3,
+        };
         return (planRank[planName] || 0) > (planRank[currentPlan] || 0);
     };
 
@@ -232,7 +273,9 @@ export default function Pricing() {
                 >
                     <div className="inline-flex items-center space-x-2 rounded-lg px-4 py-2 mb-6 glass border dark:border-muted-foreground/30">
                         <Zap className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">Credit-Based Pricing</span>
+                        <span className="text-sm font-medium">
+                            Credit-Based Pricing
+                        </span>
                     </div>
 
                     <h2 className="text-4xl lg:text-6xl font-bold mb-6">
@@ -271,24 +314,30 @@ export default function Pricing() {
                             {(plan.popular || plan.proPopular) && (
                                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
                                     <span className="bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full whitespace-nowrap shadow-lg shadow-primary/25">
-                                        {plan.popular ? "Most Popular" : "Best Value"}
+                                        {plan.popular
+                                            ? "Most Popular"
+                                            : "Best Value"}
                                     </span>
                                 </div>
                             )}
 
                             {/* Card body */}
                             <div
-                                className={`relative h-full flex flex-col rounded-2xl p-6 border transition-all duration-300 ${plan.popular
-                                    ? "border-primary/50 bg-primary/3 shadow-[0_0_30px_-5px] shadow-primary/20"
-                                    : "border-border/60 bg-card/50 hover:border-primary/30 hover:bg-card/80"
-                                    }`}
+                                className={`relative h-full flex flex-col rounded-2xl p-6 border transition-all duration-300 ${
+                                    plan.popular
+                                        ? "border-primary/50 bg-primary/3 shadow-[0_0_30px_-5px] shadow-primary/20"
+                                        : "border-border/60 bg-card/50 hover:border-primary/30 hover:bg-card/80"
+                                }`}
                             >
                                 {/* Header */}
                                 <div className="mb-5">
-                                    <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-3 ${plan.popular
-                                        ? "bg-primary text-primary-foreground"
-                                        : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                                        } transition-colors`}>
+                                    <div
+                                        className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-3 ${
+                                            plan.popular
+                                                ? "bg-primary text-primary-foreground"
+                                                : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                                        } transition-colors`}
+                                    >
                                         <plan.icon className="w-5 h-5" />
                                     </div>
 
@@ -327,7 +376,10 @@ export default function Pricing() {
                                 {/* Features */}
                                 <div className="space-y-3 mb-6 flex-1">
                                     {plan?.features?.map((feature, fi) => (
-                                        <div key={fi} className="flex items-start gap-2.5">
+                                        <div
+                                            key={fi}
+                                            className="flex items-start gap-2.5"
+                                        >
                                             <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                                             <span className="text-sm text-muted-foreground leading-snug">
                                                 {feature}
@@ -336,7 +388,10 @@ export default function Pricing() {
                                     ))}
 
                                     {plan?.limitations?.map((limitation) => (
-                                        <div key={limitation} className="flex items-start gap-2.5">
+                                        <div
+                                            key={limitation}
+                                            className="flex items-start gap-2.5"
+                                        >
                                             <div className="w-4 h-4 shrink-0 mt-0.5 flex items-center justify-center">
                                                 <div className="w-2.5 h-0.5 bg-muted-foreground/40 rounded-full" />
                                             </div>
@@ -349,11 +404,14 @@ export default function Pricing() {
 
                                 {/* CTA Button */}
                                 <Button
-                                    variant={plan.popular ? "default" : "outline"}
-                                    className={`w-full font-semibold cursor-pointer rounded-xl h-11 ${plan.popular
-                                        ? ""
-                                        : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                                        }`}
+                                    variant={
+                                        plan.popular ? "default" : "outline"
+                                    }
+                                    className={`w-full font-semibold cursor-pointer rounded-xl h-11 ${
+                                        plan.popular
+                                            ? ""
+                                            : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                                    }`}
                                     onClick={() => handlePlanClick(plan.name)}
                                     disabled={
                                         (plan.name === "Free" &&
@@ -369,8 +427,8 @@ export default function Pricing() {
                                             usageData !== null &&
                                             usageData.plan === "Free" &&
                                             usageData.canUpload === false
-                                            ? "Limit Reached"
-                                            : plan.cta}
+                                          ? "Limit Reached"
+                                          : plan.cta}
                                 </Button>
                             </div>
                         </motion.div>
@@ -385,8 +443,8 @@ export default function Pricing() {
                     className="text-center mt-12"
                 >
                     <p className="text-muted-foreground">
-                        Each AI tool costs credits. Free tools (crop, resize) always remain free.
-                        Upgrade anytime for more credits.
+                        Each AI tool costs credits. Free tools (crop, resize)
+                        always remain free. Upgrade anytime for more credits.
                     </p>
                 </motion.div>
             </div>
