@@ -1,13 +1,9 @@
-import Razorpay from "razorpay";
+import { razorpayClient } from "@/lib/razorpay.server";
+import { currentUserUsage } from "@/lib/usage.server";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUpgradeAmount, isUpgrade, type PlanType } from "@/lib/plans";
-
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID!,
-    key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
 
 export async function POST(request: NextRequest) {
     try {
@@ -16,7 +12,7 @@ export async function POST(request: NextRequest) {
         if (!token?.email) {
             return NextResponse.json(
                 { error: "Unauthorized" },
-                { status: 401 }
+                { status: 401 },
             );
         }
 
@@ -27,7 +23,7 @@ export async function POST(request: NextRequest) {
         if (!user) {
             return NextResponse.json(
                 { error: "User not found" },
-                { status: 404 }
+                { status: 404 },
             );
         }
 
@@ -39,21 +35,24 @@ export async function POST(request: NextRequest) {
         if (!["Starter", "Lite", "Pro"].includes(planType)) {
             return NextResponse.json(
                 { error: "Invalid plan type" },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
-        const fromPlan = user.plan as PlanType;
+        const current = await currentUserUsage(user.id);
+        const fromPlan = current.plan as PlanType;
 
         // check if user already has an active subscription for this plan
-        const isSubscriptionActive = user.subscriptionExpiresAt
-            ? new Date(user.subscriptionExpiresAt) > new Date()
+        const isSubscriptionActive = current.subscriptionExpiresAt
+            ? new Date(current.subscriptionExpiresAt) > new Date()
             : false;
 
         if (fromPlan === planType && isSubscriptionActive) {
             return NextResponse.json(
-                { error: `You already have an active ${planType} Plan subscription` },
-                { status: 400 }
+                {
+                    error: `You already have an active ${planType} Plan subscription`,
+                },
+                { status: 400 },
             );
         }
 
@@ -61,13 +60,17 @@ export async function POST(request: NextRequest) {
         if (!isUpgrade(fromPlan, planType)) {
             return NextResponse.json(
                 { error: `Cannot downgrade from ${fromPlan} to ${planType}` },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
         const amount = getUpgradeAmount(fromPlan, planType);
 
         const receipt = `rcpt_${user.id.slice(-10)}_${Date.now().toString().slice(-8)}`;
+        const previousSubscription = await prisma.subscriptions.findFirst({
+            where: { userId: user.id },
+            orderBy: { updatedAt: "desc" },
+        });
 
         // create razorpay order
         const options = {
@@ -79,10 +82,13 @@ export async function POST(request: NextRequest) {
                 userEmail: user.email,
                 plan: planType,
                 fromPlan: fromPlan,
+                previousOrderId:
+                    previousSubscription?.razorpaySubscriptionId ?? "none",
+                analyticsDistinctId: token.sub ?? "",
             },
         };
 
-        const order = await razorpay.orders.create(options);
+        const order = await razorpayClient().orders.create(options);
 
         return NextResponse.json({
             orderId: order.id,
@@ -90,11 +96,11 @@ export async function POST(request: NextRequest) {
             currency: order.currency,
             key: process.env.RAZORPAY_KEY_ID!,
         });
-    } catch (err: any) {
+    } catch (err) {
         console.error("Razorpay order creation error:", err);
         return NextResponse.json(
-            { error: "Failed to create order", details: err.message },
-            { status: 500 }
+            { error: "Failed to create order" },
+            { status: 500 },
         );
     }
 }
