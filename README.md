@@ -95,8 +95,9 @@ Maximum single-operation debit enforced server-side: **300** credits (`MAX_CREDI
 ### Razorpay
 
 - **Order creation** — `POST /api/create-razorpay-order`: authenticated users only; prevents downgrade and duplicate active same-tier subscription; amount uses **pro-rata** upgrade pricing from current paid tier (`getUpgradeAmount`).
-- **Payment verification** — `POST /api/verify-razorpay-payment`: HMAC signature check, then updates user plan, credits, uploads, subscription end date (~1 month), and `subscriptions` collection.
-- **Webhooks** — `POST /api/razorpay-webhook`: verifies the `x-razorpay-signature` header with `RAZORPAY_WEBHOOK_SECRET`; handles `payment.captured` (aligns user to paid tier) and `payment.failed` (resets affected user toward Free when subscription can be resolved by order id).
+- **Production activation** — only a signature-verified `payment.captured` webhook grants a subscription. The browser callback shows a pending state; it never activates a plan or calls the verification endpoint in production.
+- **Development testing** — `POST /api/verify-razorpay-payment` is available only with `NODE_ENV=development` outside a production deployment. It checks the signed-in owner, HMAC, captured payment, and exact amount before using the same atomic activation path. It returns 404 in production and preview builds.
+- **Webhooks** — `POST /api/razorpay-webhook` verifies the raw body with a timing-safe HMAC using `RAZORPAY_WEBHOOK_SECRET`. It fetches order metadata, validates owner/plan/amount, and grants the captured payment exactly once in a MongoDB transaction. An immutable `payment_activations` ledger prevents duplicate delivery from refilling allowances or extending expiry. `payment.failed` webhooks validate the failed attempt against its order and persist it once in `payment_failures`, with bounded gateway error details. Duplicate deliveries are acknowledged without repeated records or analytics; failures leave all existing subscriptions and allowances intact. Failure history never blocks a later valid capture.
 
 Billing amounts in code are stored in **paise** (INR) in `PLAN_PRICES_PAISE`. The pricing UI may show approximate USD equivalents for display; **checkout is INR** via Razorpay.
 
@@ -134,7 +135,9 @@ Razorpay — orders, checkout, webhooks
 
 - Cookie: `pixsuite-anon` (httpOnly; secure in production).
 - Collection: `anonymous_sessions` with `sessionId`, optional `ipAddress`, `usageCount` / `usageLimit` (default 3).
-- **POST `/api/free-usage`** increments upload usage for guests; **POST `/api/transfer-usage`** (after sign-in) merges anonymous upload count into the user for Free/non-active subscribers; paid subscribers delete the anonymous row when appropriate.
+- **POST `/api/upload-auth`** atomically reserves one upload before issuing a unique ImageKit token valid for five minutes. Both signed-in and guest allowances are enforced here; `/api/usage` and `/api/free-usage` are read-only. A signature reservation consumes allowance even if the upload later fails.
+- Guests share a canonical trial identity per trusted IP, so clearing cookies or simultaneous first requests cannot reset that budget. A shared network also shares the guest allowance. Vercel is detected automatically. Other hosts must provide an overwriting trusted proxy and set `TRUST_PROXY_HEADERS=true`; without a trusted IP, guest signing fails closed.
+- **POST `/api/transfer-usage`** atomically merges the higher user/guest upload count after sign-in. The signing endpoint independently enforces this same shared three-upload trial, even if transfer is skipped. A new paid subscription resets upload/credit usage to zero and grants the full paid limits; neither trial usage nor its three-upload grant is added to the paid allowance. Paid requests never merge the guest record into paid counters.
 
 ---
 
@@ -143,29 +146,29 @@ Razorpay — orders, checkout, webhooks
 - **`users`**: identity, `plan` (`Free` | `Starter` | `Lite` | `Pro`), `role` (`User` | `Admin` | `Modaretor`), usage and credit counters, `subscriptionExpiresAt`, optional `razorpayCustomerId`.
 - **`subscriptions`**: links `userId` to Razorpay order/payment identifiers and `expiresAt`.
 - **`anonymous_sessions`**: guest quota tracking.
+- **`payment_activations`**: immutable processed-payment receipts keyed by Razorpay order ID using MongoDB’s unique `_id`. The ledger and user/subscription writes commit together.
+- **`payment_failures`**: immutable history of signed failed-payment attempts keyed by Razorpay payment ID, bound to the order owner and intended plan. This is an audit record, not a subscription status; captured payments remain authoritative.
 
-MongoDB ObjectId is used as primary key style (`@db.ObjectId`).
+User, subscription, and guest records use MongoDB ObjectIds (`@db.ObjectId`); activation and failure ledger keys are Razorpay order/payment ID strings.
 
 ---
 
 ## HTTP API (application)
 
-| Method    | Path                           | Purpose                                                               |
-| --------- | ------------------------------ | --------------------------------------------------------------------- |
-| GET/POST  | `/api/auth/[...nextauth]`      | NextAuth                                                              |
-| GET       | `/api/upload-auth`             | ImageKit upload signature + token for browser `@imagekit/next` client |
-| GET       | `/api/usage`                   | Authenticated: credits, uploads, plan, `canUpload`, subscription date |
-| POST      | `/api/usage`                   | Increment signed-in upload count                                      |
-| GET       | `/api/free-usage`              | Anonymous quota read (+ set cookie if new)                            |
-| POST      | `/api/free-usage`              | Anonymous upload increment                                            |
-| POST      | `/api/transfer-usage`          | Merge anonymous usage into user on login                              |
-| POST      | `/api/deduct-credits`          | Validate plan, balance; deduct feature cost                           |
-| GET/PATCH | `/api/account`                 | Read profile; PATCH name (Zod-validated)                              |
-| POST      | `/api/create-razorpay-order`   | Create Razorpay order for upgrade                                     |
-| POST      | `/api/verify-razorpay-payment` | Verify payment + activate plan                                        |
-| POST/GET  | `/api/razorpay-webhook`        | Razorpay events + health GET                                          |
+| Method    | Path                           | Purpose                                                                  |
+| --------- | ------------------------------ | ------------------------------------------------------------------------ |
+| GET/POST  | `/api/auth/[...nextauth]`      | NextAuth                                                                 |
+| POST      | `/api/upload-auth`             | Atomically reserve quota, then issue one-use ImageKit upload credentials |
+| GET       | `/api/usage`                   | Authenticated: credits, uploads, plan, `canUpload`, subscription date    |
+| GET       | `/api/free-usage`              | Anonymous quota read (+ set cookie if new)                               |
+| POST      | `/api/transfer-usage`          | Merge anonymous usage into user on login                                 |
+| POST      | `/api/deduct-credits`          | Validate plan, balance; deduct feature cost                              |
+| GET/PATCH | `/api/account`                 | Read profile; PATCH name (Zod-validated)                                 |
+| POST      | `/api/create-razorpay-order`   | Create Razorpay order for upgrade                                        |
+| POST      | `/api/verify-razorpay-payment` | Development-only payment testing; 404 in production                      |
+| POST/GET  | `/api/razorpay-webhook`        | Razorpay events + health GET                                             |
 
-All sensitive routes use `getToken` from `next-auth/jwt` except webhook (uses Razorpay signature) and upload-auth (public to signed browser clients — protection is short-lived signature/token).
+Authenticated routes use `getToken` from `next-auth/jwt`. The webhook uses the Razorpay signature. Upload signing checks the authenticated account or the canonical guest allowance before returning credentials.
 
 ---
 
@@ -204,8 +207,6 @@ pixsuite/
 └── bun.lock                   # Lockfile (Bun); npm-compatible scripts also work
 ```
 
-**Note:** `src/modules/editor/index.tsx` is a self-contained alternate editor layout and is **not** wired into `app` routes; the shipping editor UI is **`src/app/editor/page.tsx`**.
-
 ---
 
 ## Technology stack
@@ -237,6 +238,7 @@ Create a local or deployment env file with secrets (never commit). Variables **r
 | `IMAGEKIT_PUBLIC_KEY` / `IMAGEKIT_PRIVATE_KEY` | Upload authentication and signing                                                  |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`      | Server-side Razorpay API                                                           |
 | `RAZORPAY_WEBHOOK_SECRET`                      | Webhook HMAC verification                                                          |
+| `TRUST_PROXY_HEADERS`                          | Opt-in trusted forwarded IP headers on non-Vercel hosts                            |
 
 `NODE_ENV` controls cookie `secure` flag for anonymous sessions.
 
@@ -244,7 +246,6 @@ Create a local or deployment env file with secrets (never commit). Variables **r
 
 - **Google Cloud Console**: OAuth client with authorized redirect URIs matching NextAuth (`/api/auth/callback/google`).
 - **ImageKit**: Keys aligned with upload API; transformations must match the `tr` parameters used in the editor.
-- **Razorpay**: Webhook endpoint URL pointing to `/api/razorpay-webhook` with the same secret as `RAZORPAY_WEBHOOK_SECRET`.
 
 ---
 
@@ -278,21 +279,12 @@ Application default dev URL: `http://localhost:3000`. The deployed app runs at [
 
 ---
 
-## Build and release
-
-1. Set production environment variables on the host (Vercel, VM, container, etc.).
-2. Run `bun run build` (or `npm run build`).
-3. Run `bun run start` behind HTTPS so OAuth, secure cookies, and Razorpay redirects behave correctly.
-4. Point Razorpay webhooks to the public HTTPS URL of `/api/razorpay-webhook` (e.g. `https://pixsuite.csfahad.me/api/razorpay-webhook`).
-
----
-
 ## Operations and security notes
 
-- **Payment integrity**: Always verify payments server-side (signature + webhook). Client success handlers also call `/api/verify-razorpay-payment`.
-- **Upload auth**: ImageKit tokens are short-lived; private key stays server-only.
+- **Payment integrity**: Production subscriptions activate only through verified captured-payment webhooks. Development verification is gated off in production; both authorized activation paths share an atomic, replay-safe ledger.
+- **Upload auth**: A conditional atomic quota reservation precedes every signature; credentials are one-use, expire after five minutes, and are never cached. The private key stays server-only.
 - **Credits**: Deducted atomically per request in `/api/deduct-credits`; feature availability and caps enforced server-side.
-- **Anonymous abuse**: Quota is per cookie session with IP fallback for exhausted sessions; tune limits in `anonymous_sessions` defaults and `free-usage` handler if needed.
+- **Anonymous allowance**: A canonical identity per trusted IP survives cookie resets and concurrent requests; trial usage increments atomically with an allowance condition. User/guest usage transfer cannot reopen the guest budget.
 - **Schema**: Enum `Role` includes `Admin` / `Modaretor`; ensure any future admin tooling aligns with typo’d value if referenced in code.
 
 ---
