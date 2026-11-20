@@ -1,7 +1,7 @@
 "use client";
 
-import Footer from "@/components/footer";
 import { motion } from "motion/react";
+import Footer from "@/components/footer";
 
 export default function PrivacyPage() {
     return (
@@ -26,6 +26,12 @@ export default function PrivacyPage() {
                             such as when you create an account, subscribe to a
                             plan, or communicate with us. This may include your
                             name, email address, and payment information.
+                        </p>
+                        <p>
+                            We also collect pageviews, browser and device
+                            information, and product usage events, such as
+                            uploads, editing tool selections, exports, and
+                            subscription checkout outcomes.
                         </p>
                     </section>
 
