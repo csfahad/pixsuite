@@ -27,7 +27,10 @@ const PLAN_RANK: Record<PlanType, number> = {
     Pro: 3,
 };
 
-export function isPlanAtLeast(userPlan: PlanType, requiredPlan: PlanType): boolean {
+export function isPlanAtLeast(
+    userPlan: PlanType,
+    requiredPlan: PlanType,
+): boolean {
     return PLAN_RANK[userPlan] >= PLAN_RANK[requiredPlan];
 }
 
@@ -50,13 +53,12 @@ export const PLAN_UPLOAD_LIMITS: Record<PlanType, number> = {
 };
 
 export const PLAN_PRICES_PAISE: Record<"Starter" | "Lite" | "Pro", number> = {
-    Starter: 99900,  // ₹999
-    Lite: 269900,    // ₹2,699
-    Pro: 549900,     // ₹5,499
+    Starter: 99900, // ₹999
+    Lite: 269900, // ₹2,699
+    Pro: 549900, // ₹5,499
 };
 
 type PaidPlan = "Starter" | "Lite" | "Pro";
-
 
 export function getUpgradeAmount(fromPlan: PlanType, toPlan: PaidPlan): number {
     const toPrice = PLAN_PRICES_PAISE[toPlan];
@@ -68,13 +70,19 @@ export function getUpgradeAmount(fromPlan: PlanType, toPlan: PaidPlan): number {
     return Math.max(0, toPrice - fromPrice);
 }
 
-export function getUpgradePriceDisplay(fromPlan: PlanType, toPlan: PaidPlan): string {
+export function getUpgradePriceDisplay(
+    fromPlan: PlanType,
+    toPlan: PaidPlan,
+): string {
     const paise = getUpgradeAmount(fromPlan, toPlan);
     const rupees = Math.round(paise / 100);
     return rupees.toLocaleString("en-IN");
 }
 
-export function getUpgradePriceDisplayUSD(fromPlan: PlanType, toPlan: PaidPlan): string {
+export function getUpgradePriceDisplayUSD(
+    fromPlan: PlanType,
+    toPlan: PaidPlan,
+): string {
     const paise = getUpgradeAmount(fromPlan, toPlan);
     const rupees = paise / 100;
     // approximate conversion
@@ -86,7 +94,12 @@ export function getUpgradePriceDisplayUSD(fromPlan: PlanType, toPlan: PaidPlan):
 export function getUpgradedUsage(
     _fromPlan: PlanType,
     toPlan: PaidPlan,
-): { creditsUsed: number; creditLimit: number; uploadCount: number; uploadLimit: number } {
+): {
+    creditsUsed: number;
+    creditLimit: number;
+    uploadCount: number;
+    uploadLimit: number;
+} {
     return {
         creditsUsed: 0,
         creditLimit: PLAN_CREDIT_LIMITS[toPlan],
@@ -97,12 +110,16 @@ export function getUpgradedUsage(
 
 // get the credit cost for a feature, returns -1 if unknown
 export function getFeatureCreditCost(featureId: string): number {
+    if (!Object.hasOwn(CREDIT_COSTS, featureId)) return -1;
     const cost = CREDIT_COSTS[featureId];
     return cost !== undefined ? cost : -1;
 }
 
 // check if a feature is available for a given plan
-export function isFeatureAvailable(featureId: string, userPlan: PlanType): boolean {
+export function isFeatureAvailable(
+    featureId: string,
+    userPlan: PlanType,
+): boolean {
     const minPlan = FEATURE_MIN_PLAN[featureId];
     if (!minPlan) return true; // no restriction
     return isPlanAtLeast(userPlan, minPlan);
