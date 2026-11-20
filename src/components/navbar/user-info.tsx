@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { signOut, useSession } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react";
 import {
     BadgeCheckIcon,
     CreditCardIcon,
     ImagePlus,
     LogOutIcon,
-} from "lucide-react"
+} from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -14,39 +14,47 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { trackSignOut } from "@/lib/analytics";
 
 export default function UserInfo() {
-    const { data: session } = useSession()
+    const { data: session } = useSession();
 
     const getInitials = (name: string | null | undefined) => {
-        if (!name) return "U"
-        const names = name.split(" ")
+        if (!name) return "U";
+        const names = name.split(" ");
         return names.length >= 2
             ? `${names[0][0]}${names[1][0]}`.toUpperCase()
-            : name.substring(0, 2).toUpperCase()
-    }
+            : name.substring(0, 2).toUpperCase();
+    };
 
     const handleSignOut = () => {
-        signOut({ callbackUrl: "/" })
-    }
+        trackSignOut();
+        signOut({ callbackUrl: "/" });
+    };
 
-    const profileImage = session?.user?.image || session?.user?.avatar || ""
+    const profileImage = session?.user?.image || session?.user?.avatar || "";
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full cursor-pointer">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full cursor-pointer"
+                >
                     <Avatar>
                         <AvatarImage
                             src={profileImage}
                             alt={session?.user?.name || "User"}
                             referrerPolicy="no-referrer"
                         />
-                        <AvatarFallback>{getInitials(session?.user?.name)}</AvatarFallback>
+                        <AvatarFallback>
+                            {getInitials(session?.user?.name)}
+                        </AvatarFallback>
                     </Avatar>
                 </Button>
             </DropdownMenuTrigger>
@@ -79,5 +87,5 @@ export default function UserInfo() {
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
-    )
+    );
 }
