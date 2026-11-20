@@ -25,10 +25,8 @@ export default function PrivacyPage() {
                             We collect information you provide directly to us,
                             such as when you create an account, subscribe to a
                             plan, or communicate with us. This may include your
-                            name, email address, and payment information.
-                        </p>
-                        <p>
-                            We also collect pageviews, browser and device
+                            name, email address, and payment information. We
+                            also collect pageviews, browser and device
                             information, and product usage events, such as
                             uploads, editing tool selections, exports, and
                             subscription checkout outcomes.
