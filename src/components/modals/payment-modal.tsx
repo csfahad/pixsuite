@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Crown, LogIn, Rocket, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { trackEvent } from "@/lib/analytics";
+import { getAnalyticsSessionId, trackEvent } from "@/lib/analytics";
 import {
     getUpgradePriceDisplay,
     PLAN_CREDIT_LIMITS,
@@ -16,6 +16,7 @@ declare global {
     interface Window {
         Razorpay: new (options: Record<string, unknown>) => {
             open: () => void;
+            on: (event: "payment.failed", handler: (response: CheckoutFailure) => void) => void;
         };
     }
 }
@@ -24,6 +25,17 @@ interface CheckoutResponse {
     razorpay_order_id: string;
     razorpay_payment_id: string;
     razorpay_signature: string;
+}
+
+interface CheckoutFailure {
+    error: {
+        code?: string;
+        description?: string;
+        source?: string;
+        step?: string;
+        reason?: string;
+        metadata?: { order_id?: string; payment_id?: string };
+    };
 }
 
 interface PaymentModalProps {
@@ -118,10 +130,14 @@ export default function PaymentModal({
                 selected_plan: plan,
                 current_plan: currentPlan,
                 is_authenticated: isAuthenticated,
+                credits_remaining: creditsRemaining,
+                upload_count: uploadCount,
+                upload_limit: uploadLimit,
             });
         }
+        if (!isOpen && viewedModal.current) trackEvent("upgrade_modal_closed", { selected_plan: plan });
         viewedModal.current = isOpen;
-    }, [isOpen, plan, currentPlan, isAuthenticated]);
+    }, [isOpen, plan, currentPlan, isAuthenticated, creditsRemaining, uploadCount, uploadLimit]);
 
     useEffect(() => {
         setMounted(true);
@@ -134,6 +150,8 @@ export default function PaymentModal({
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         script.async = true;
+        script.onload = () => trackEvent("checkout_sdk_loaded");
+        script.onerror = () => trackEvent("checkout_sdk_failed", { source: script.src });
         document.body.appendChild(script);
 
         return () => {
@@ -157,6 +175,7 @@ export default function PaymentModal({
                 },
                 body: JSON.stringify({
                     plan: plan,
+                    analyticsSessionId: getAnalyticsSessionId(),
                 }),
             });
 
@@ -169,6 +188,14 @@ export default function PaymentModal({
             if (!orderId || !key) {
                 throw new Error("Invalid order details received");
             }
+            const checkoutProperties = {
+                selected_plan: plan,
+                previous_plan: currentPlan,
+                order_id: orderId,
+                currency,
+                amount_paise: amount,
+            };
+            trackEvent("checkout_order_created", checkoutProperties);
 
             if (!window.Razorpay) {
                 throw new Error(
@@ -187,9 +214,10 @@ export default function PaymentModal({
                 order_id: orderId,
                 handler: async function (response: CheckoutResponse) {
                     trackEvent("checkout_submitted", {
-                        selected_plan: plan,
-                        currency,
-                        amount_paise: amount,
+                        ...checkoutProperties,
+                        payment_id: response.razorpay_payment_id,
+                        source: "checkout_callback",
+                        payment_status: "awaiting_webhook",
                     });
                     // Production waits for the signed webhook. Checkout success grants no entitlement.
                     if (process.env.NODE_ENV !== "development") {
@@ -233,10 +261,8 @@ export default function PaymentModal({
                         if (result.success) {
                             if (result.activated)
                                 trackEvent("checkout_completed", {
-                                    selected_plan: plan,
-                                    previous_plan: currentPlan,
-                                    currency,
-                                    amount_paise: amount,
+                                    ...checkoutProperties,
+                                    payment_id: response.razorpay_payment_id,
                                     source: "development",
                                 });
                             sessionStorage.setItem(
@@ -249,7 +275,9 @@ export default function PaymentModal({
                         }
                     } catch (err) {
                         trackEvent("checkout_failed", {
-                            selected_plan: plan,
+                            ...checkoutProperties,
+                            payment_id: response.razorpay_payment_id,
+                            error: err instanceof Error ? err.message : String(err),
                             stage: "payment_verification",
                         });
                         sessionStorage.setItem("pixsuite_payment", "failed");
@@ -265,7 +293,7 @@ export default function PaymentModal({
                 modal: {
                     ondismiss: function () {
                         trackEvent("checkout_cancelled", {
-                            selected_plan: plan,
+                            ...checkoutProperties,
                         });
                         setIsLoading(false);
                         sessionStorage.setItem("pixsuite_payment", "cancelled");
@@ -275,15 +303,27 @@ export default function PaymentModal({
             };
 
             const razorpay = new window.Razorpay(options);
+            // This callback records an attempt; the signed webhook remains the
+            // authority for both persisted failures and subscription activation.
+            razorpay.on("payment.failed", (response) => {
+                trackEvent("checkout_payment_failed", {
+                    ...checkoutProperties,
+                    payment_id: response.error.metadata?.payment_id,
+                    failure_code: response.error.code,
+                    error_description: response.error.description,
+                    error_source: response.error.source,
+                    error_step: response.error.step,
+                    error_reason: response.error.reason,
+                    source: "checkout_callback",
+                });
+            });
             onClose();
             razorpay.open();
             trackEvent("checkout_opened", {
-                selected_plan: plan,
-                currency,
-                amount_paise: amount,
+                ...checkoutProperties,
             });
         } catch (err) {
-            trackEvent("checkout_failed", { selected_plan: plan, stage });
+            trackEvent("checkout_failed", { selected_plan: plan, stage, error: err instanceof Error ? err.message : String(err) });
             console.error("Upgrade failed:", err);
             alert(
                 err instanceof Error

@@ -19,7 +19,7 @@ import { useRouter, usePathname } from "next/navigation";
 import ModeToggle from "@/components/modeToggle/index";
 import UserInfo from "./user-info";
 import { BrandLogo } from "@/components/brand/logo";
-import { trackSignOut } from "@/lib/analytics";
+import { trackEvent, trackSignOut } from "@/lib/analytics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Navbar() {
@@ -40,6 +40,10 @@ export default function Navbar() {
     }, [scrollYProgress]);
 
     const scrollToSection = (sectionId: string) => {
+        trackEvent("navigation_selected", {
+            destination: `/#${sectionId}`,
+            source: "navbar",
+        });
         if (pathname !== "/") {
             router.push(`/#${sectionId}`);
             return;
@@ -56,6 +60,10 @@ export default function Navbar() {
     };
 
     const handleSubmit = async () => {
+        trackEvent("navigation_selected", {
+            destination: "/editor",
+            source: "navbar",
+        });
         router.push("/editor");
     };
 
@@ -102,7 +110,12 @@ export default function Navbar() {
                             <div className="flex items-center gap-2 lg:hidden">
                                 <ModeToggle />
                                 <button
-                                    onClick={() => setMenuState(!menuState)}
+                                    onClick={() => {
+                                        trackEvent("navigation_menu_toggled", {
+                                            open: !menuState,
+                                        });
+                                        setMenuState(!menuState);
+                                    }}
                                     aria-label={
                                         menuState == true
                                             ? "Close Menu"
@@ -231,7 +244,7 @@ export default function Navbar() {
                                                     )}
                                                 </AvatarFallback>
                                             </Avatar>
-                                            <div className="ph-no-capture flex flex-col">
+                                            <div className="flex flex-col">
                                                 <span className="text-sm font-semibold text-foreground">
                                                     {session?.user?.name}
                                                 </span>
@@ -258,6 +271,14 @@ export default function Navbar() {
                                             <button
                                                 type="button"
                                                 onClick={() => {
+                                                    trackEvent(
+                                                        "navigation_selected",
+                                                        {
+                                                            destination:
+                                                                "/account",
+                                                            source: "mobile_menu",
+                                                        },
+                                                    );
                                                     router.push("/account");
                                                     setMenuState(false);
                                                 }}
@@ -269,6 +290,14 @@ export default function Navbar() {
                                             <button
                                                 type="button"
                                                 onClick={() => {
+                                                    trackEvent(
+                                                        "navigation_selected",
+                                                        {
+                                                            destination:
+                                                                "/account?tab=plan",
+                                                            source: "mobile_menu",
+                                                        },
+                                                    );
                                                     router.push(
                                                         "/account?tab=plan",
                                                     );
