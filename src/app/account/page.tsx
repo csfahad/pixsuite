@@ -3,7 +3,11 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
+import {
+    setAnalyticsPlan,
+    trackEvent,
+    updateAnalyticsProfile,
+} from "@/lib/analytics";
 import { motion, AnimatePresence } from "motion/react";
 import {
     User,
@@ -164,9 +168,16 @@ function AccountPageContent() {
                 const data = await res.json();
                 setUserData(data);
                 setAnalyticsPlan(data.plan);
+                updateAnalyticsProfile(data);
+                trackEvent("account_loaded", { profile: data });
                 setNewName(data.name);
+            } else {
+                trackEvent("account_load_failed", { status_code: res.status });
             }
         } catch (err) {
+            trackEvent("account_load_failed", {
+                error: err instanceof Error ? err.message : String(err),
+            });
             console.error("Failed to fetch account data:", err);
         } finally {
             setLoading(false);
@@ -214,13 +225,30 @@ function AccountPageContent() {
                 setUserData(updated);
                 setEditingName(false);
                 setSaveSuccess(true);
-                trackEvent("account_profile_updated", { field: "name" });
+                updateAnalyticsProfile(updated);
+                trackEvent("account_profile_updated", {
+                    field: "name",
+                    previous_name: userData?.name,
+                    name: updated.name,
+                    profile: updated,
+                });
                 setTimeout(() => setSaveSuccess(false), 2500);
             } else {
                 const err = await res.json();
+                trackEvent("account_profile_update_failed", {
+                    field: "name",
+                    name: newName.trim(),
+                    status_code: res.status,
+                    error: err.error,
+                });
                 setSaveError(err.error || "Failed to update name");
             }
-        } catch {
+        } catch (err) {
+            trackEvent("account_profile_update_failed", {
+                field: "name",
+                name: newName.trim(),
+                error: err instanceof Error ? err.message : String(err),
+            });
             setSaveError("Something went wrong");
         } finally {
             setSaving(false);
@@ -297,7 +325,7 @@ function AccountPageContent() {
 
     return (
         <TooltipProvider>
-            <div className="ph-no-capture min-h-screen bg-background pt-28 pb-12">
+            <div className="min-h-screen bg-background pt-28 pb-12">
                 {/* Page header */}
                 <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 mb-8">
                     <motion.div
@@ -390,7 +418,18 @@ function AccountPageContent() {
                                         key="account"
                                         userData={userData}
                                         editingName={editingName}
-                                        setEditingName={setEditingName}
+                                        setEditingName={(editing) => {
+                                            trackEvent(
+                                                editing
+                                                    ? "account_profile_edit_started"
+                                                    : "account_profile_edit_cancelled",
+                                                {
+                                                    field: "name",
+                                                    name: newName,
+                                                },
+                                            );
+                                            setEditingName(editing);
+                                        }}
                                         newName={newName}
                                         setNewName={setNewName}
                                         saving={saving}
@@ -403,7 +442,7 @@ function AccountPageContent() {
                                         formatRelativeDate={formatRelativeDate}
                                         profileImage={
                                             session?.user?.image ||
-                                            (session as any)?.user?.avatar ||
+                                            session?.user?.avatar ||
                                             ""
                                         }
                                     />

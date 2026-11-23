@@ -39,7 +39,9 @@ export default function UserInfo() {
     const profileImage = session?.user?.image || session?.user?.avatar || "";
 
     return (
-        <DropdownMenu onOpenChange={(open) => trackEvent("user_menu_toggled", { open })}>
+        <DropdownMenu
+            onOpenChange={(open) => trackEvent("user_menu_toggled", { open })}
+        >
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="ghost"
@@ -59,7 +61,15 @@ export default function UserInfo() {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <Link href="/editor" onClick={() => trackEvent("navigation_selected", { destination: "/editor", source: "user_menu" })}>
+                <Link
+                    href="/editor"
+                    onClick={() =>
+                        trackEvent("navigation_selected", {
+                            destination: "/editor",
+                            source: "user_menu",
+                        })
+                    }
+                >
                     <DropdownMenuItem>
                         <ImagePlus />
                         Launch Editor
@@ -67,13 +77,29 @@ export default function UserInfo() {
                     <DropdownMenuSeparator />
                 </Link>
                 <DropdownMenuGroup>
-                    <Link href="/account" onClick={() => trackEvent("navigation_selected", { destination: "/account", source: "user_menu" })}>
+                    <Link
+                        href="/account"
+                        onClick={() =>
+                            trackEvent("navigation_selected", {
+                                destination: "/account",
+                                source: "user_menu",
+                            })
+                        }
+                    >
                         <DropdownMenuItem>
                             <BadgeCheckIcon />
                             Account
                         </DropdownMenuItem>
                     </Link>
-                    <Link href="/account?tab=plan" onClick={() => trackEvent("navigation_selected", { destination: "/account?tab=plan", source: "user_menu" })}>
+                    <Link
+                        href="/account?tab=plan"
+                        onClick={() =>
+                            trackEvent("navigation_selected", {
+                                destination: "/account?tab=plan",
+                                source: "user_menu",
+                            })
+                        }
+                    >
                         <DropdownMenuItem>
                             <CreditCardIcon />
                             Billing

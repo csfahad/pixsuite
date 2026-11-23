@@ -16,7 +16,10 @@ declare global {
     interface Window {
         Razorpay: new (options: Record<string, unknown>) => {
             open: () => void;
-            on: (event: "payment.failed", handler: (response: CheckoutFailure) => void) => void;
+            on: (
+                event: "payment.failed",
+                handler: (response: CheckoutFailure) => void,
+            ) => void;
         };
     }
 }
@@ -135,9 +138,18 @@ export default function PaymentModal({
                 upload_limit: uploadLimit,
             });
         }
-        if (!isOpen && viewedModal.current) trackEvent("upgrade_modal_closed", { selected_plan: plan });
+        if (!isOpen && viewedModal.current)
+            trackEvent("upgrade_modal_closed", { selected_plan: plan });
         viewedModal.current = isOpen;
-    }, [isOpen, plan, currentPlan, isAuthenticated, creditsRemaining, uploadCount, uploadLimit]);
+    }, [
+        isOpen,
+        plan,
+        currentPlan,
+        isAuthenticated,
+        creditsRemaining,
+        uploadCount,
+        uploadLimit,
+    ]);
 
     useEffect(() => {
         setMounted(true);
@@ -151,7 +163,8 @@ export default function PaymentModal({
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         script.async = true;
         script.onload = () => trackEvent("checkout_sdk_loaded");
-        script.onerror = () => trackEvent("checkout_sdk_failed", { source: script.src });
+        script.onerror = () =>
+            trackEvent("checkout_sdk_failed", { source: script.src });
         document.body.appendChild(script);
 
         return () => {
@@ -277,7 +290,10 @@ export default function PaymentModal({
                         trackEvent("checkout_failed", {
                             ...checkoutProperties,
                             payment_id: response.razorpay_payment_id,
-                            error: err instanceof Error ? err.message : String(err),
+                            error:
+                                err instanceof Error
+                                    ? err.message
+                                    : String(err),
                             stage: "payment_verification",
                         });
                         sessionStorage.setItem("pixsuite_payment", "failed");
@@ -323,7 +339,11 @@ export default function PaymentModal({
                 ...checkoutProperties,
             });
         } catch (err) {
-            trackEvent("checkout_failed", { selected_plan: plan, stage, error: err instanceof Error ? err.message : String(err) });
+            trackEvent("checkout_failed", {
+                selected_plan: plan,
+                stage,
+                error: err instanceof Error ? err.message : String(err),
+            });
             console.error("Upgrade failed:", err);
             alert(
                 err instanceof Error
