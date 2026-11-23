@@ -30,6 +30,13 @@ export async function POST(request: NextRequest) {
         // get plan from request body
         const body = await request.json().catch(() => ({}));
         const planType = (body.plan || "Starter") as "Starter" | "Lite" | "Pro";
+        const analyticsSessionId =
+            typeof body.analyticsSessionId === "string" &&
+            /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(
+                body.analyticsSessionId,
+            )
+                ? body.analyticsSessionId
+                : "";
 
         // validate plan type
         if (!["Starter", "Lite", "Pro"].includes(planType)) {
@@ -85,6 +92,7 @@ export async function POST(request: NextRequest) {
                 previousOrderId:
                     previousSubscription?.razorpaySubscriptionId ?? "none",
                 analyticsDistinctId: token.sub ?? "",
+                ...(analyticsSessionId ? { analyticsSessionId } : {}),
             },
         };
 
