@@ -205,6 +205,7 @@ export default function UploadZone({
             let stage = "upload_authorization";
             const properties = {
                 source,
+                file_name: imageFile.name,
                 file_type: imageFile.type,
                 size_bytes: imageFile.size,
                 is_authenticated: isAuthenticated,
@@ -222,12 +223,17 @@ export default function UploadZone({
                 onImageUpload(imageUrl);
                 trackEvent("image_upload_completed", {
                     ...properties,
+                    image_url: imageUrl,
+                    plan: auth.usage.plan,
+                    upload_count: auth.usage.uploadCount,
+                    upload_limit: auth.usage.uploadLimit,
                     duration_ms: Math.round(performance.now() - startedAt),
                 });
             } catch (err) {
                 trackEvent("image_upload_failed", {
                     ...properties,
                     stage,
+                    error: err instanceof Error ? err.message : String(err),
                     duration_ms: Math.round(performance.now() - startedAt),
                 });
                 console.error("Upload failed:", err);
@@ -253,7 +259,7 @@ export default function UploadZone({
     };
 
     const clearImage = () => {
-        trackEvent("image_cleared");
+        trackEvent("image_cleared", { image_url: uploadedImage });
         setUploadedImage(null);
         onImageUpload("");
     };
@@ -281,7 +287,7 @@ export default function UploadZone({
                             stiffness: 300,
                             damping: 25,
                         }}
-                        className="ph-no-capture relative group rounded-xl overflow-hidden border border-border"
+                        className="relative group rounded-xl overflow-hidden border border-border"
                     >
                         <button
                             onClick={clearImage}
@@ -345,6 +351,9 @@ export default function UploadZone({
                                 type="file"
                                 accept="image/*"
                                 onChange={handleFileSelect}
+                                onClick={() =>
+                                    trackEvent("image_picker_opened")
+                                }
                                 className="hidden"
                                 id="file-upload"
                             />
