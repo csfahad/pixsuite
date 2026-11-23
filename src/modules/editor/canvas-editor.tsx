@@ -31,6 +31,12 @@ export default function CanvasEditor({
         const x = e.clientX - rect.left;
         const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
         setSliderPosition(percentage);
+        trackEvent("editor_comparison_adjusted", {
+            position_percent: percentage,
+            input: "mouse",
+            original_image_url: originalImage,
+            processed_image_url: processedImage,
+        });
     };
 
     const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -90,7 +96,7 @@ export default function CanvasEditor({
             {/* Canvas Container */}
             <motion.div
                 layout
-                className="ph-no-capture relative editor-panel overflow-hidden aspect-4/3"
+                className="relative editor-panel overflow-hidden aspect-4/3"
             >
                 {/* Processing Overlay */}
                 <AnimatePresence>
@@ -141,6 +147,14 @@ export default function CanvasEditor({
                         onMouseMove={handleSliderMove}
                         onClick={handleSliderClick}
                         onTouchMove={handleTouchMove}
+                        onTouchEnd={() =>
+                            trackEvent("editor_comparison_adjusted", {
+                                position_percent: sliderPosition,
+                                input: "touch",
+                                original_image_url: originalImage,
+                                processed_image_url: processedImage,
+                            })
+                        }
                     >
                         {/* Original */}
                         <div className="absolute inset-0">
@@ -238,6 +252,8 @@ export default function CanvasEditor({
                                 onClick={() => {
                                     trackEvent("editor_comparison_toggled", {
                                         enabled: !showComparison,
+                                        original_image_url: originalImage,
+                                        processed_image_url: processedImage,
                                     });
                                     setShowComparison(!showComparison);
                                 }}
