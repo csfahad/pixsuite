@@ -39,7 +39,11 @@ export async function POST(request: NextRequest) {
             const result = await recordPaymentFailure(order, payment);
             if (result.recorded)
                 after(() =>
-                    trackPaymentOutcome(order, "failed", payment.error_code),
+                    trackPaymentOutcome(
+                        order,
+                        "failed",
+                        event.payload.payment.entity,
+                    ),
                 );
             return NextResponse.json({ success: true });
         }
@@ -55,7 +59,13 @@ export async function POST(request: NextRequest) {
             source: "webhook",
         });
         if (result.activated)
-            after(() => trackPaymentOutcome(order, "captured"));
+            after(() =>
+                trackPaymentOutcome(
+                    order,
+                    "captured",
+                    event.payload.payment.entity,
+                ),
+            );
         return NextResponse.json({ success: true });
     } catch (error) {
         // Provider/database failures remain non-2xx so Razorpay retries delivery.
