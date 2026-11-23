@@ -222,6 +222,11 @@ export default function Editor() {
     };
 
     const handleImageUpload = (imageUrl: string) => {
+        if (imageUrl)
+            trackEvent("editor_image_loaded", {
+                image_url: imageUrl,
+                plan: userPlan,
+            });
         setUploadedImage(imageUrl);
         setProcessedImage(null);
         setProcessedImageHQ(null);
@@ -235,6 +240,9 @@ export default function Editor() {
         trackEvent("editor_prompt_submitted", {
             tool_id: promptToolId,
             plan: userPlan,
+            prompt: promptText,
+            image_url: uploadedImage,
+            active_effects: Array.from(activeEffects),
         });
         await applyEffect(promptToolId, promptText);
         setShowPromptInput(false);
@@ -332,6 +340,12 @@ export default function Editor() {
             }
 
             setCreditsRemaining(data.creditsRemaining ?? 0);
+            trackEvent("editor_credits_deducted", {
+                tool_id: featureId,
+                credits_spent: creditCost,
+                credits_remaining: data.creditsRemaining,
+                plan: userPlan,
+            });
             return true;
         } catch (err) {
             trackEvent("editor_tool_blocked", {
@@ -351,7 +365,12 @@ export default function Editor() {
 
         const tool = allTools.find((t) => t.id === toolId);
         if (!tool) return;
-        trackEvent("editor_tool_selected", { tool_id: toolId, plan: userPlan });
+        trackEvent("editor_tool_selected", {
+            tool_id: toolId,
+            tool_name: tool.name,
+            plan: userPlan,
+            image_url: uploadedImage,
+        });
 
         // check if tool is locked by plan
         if (isToolLocked(tool)) {
@@ -370,7 +389,6 @@ export default function Editor() {
         // toggle effect on/off
         const newActiveEffects = new Set(activeEffects);
         if (newActiveEffects.has(toolId)) {
-            trackEvent("editor_effect_removed", { tool_id: toolId });
             newActiveEffects.delete(toolId);
             setActiveEffects(newActiveEffects);
 
@@ -388,6 +406,12 @@ export default function Editor() {
                           )
                           .join(":")}`
                     : uploadedImage;
+            trackEvent("editor_effect_removed", {
+                tool_id: toolId,
+                prompt: effectPrompts[toolId],
+                active_effects: remainingEffects,
+                image_url: newImageUrl,
+            });
             setProcessedImage(newImageUrl);
             setProcessedImageHQ(
                 remainingEffects.length > 0 ? newImageUrl : null,
@@ -397,6 +421,10 @@ export default function Editor() {
 
         // check if tool requires prompt
         if (tool.hasPrompt) {
+            trackEvent("editor_prompt_opened", {
+                tool_id: toolId,
+                image_url: uploadedImage,
+            });
             setShowPromptInput(true);
             setPromptText("");
             setPromptToolId(toolId);
@@ -414,12 +442,6 @@ export default function Editor() {
         const allowed = await deductCredits(toolId);
         if (!allowed) return;
         const startedAt = performance.now();
-        trackEvent("editor_processing_started", {
-            tool_id: toolId,
-            has_prompt: Boolean(prompt),
-            credits_spent: CREDIT_COSTS[toolId],
-            plan: userPlan,
-        });
 
         const newJob: ProcessingJob = {
             id: Date.now().toString(),
@@ -453,6 +475,19 @@ export default function Editor() {
 
         // low-quality preview URL for instant display
         const previewUrl = `${uploadedImage}?tr=${transforms.join(":")},q-40`;
+        const processingProperties = {
+            job_id: newJob.id,
+            tool_id: toolId,
+            prompt,
+            has_prompt: Boolean(prompt),
+            prompts: newPrompts,
+            credits_spent: CREDIT_COSTS[toolId],
+            plan: userPlan,
+            original_image_url: uploadedImage,
+            image_url: newImageUrl,
+            active_effects: allEffects,
+        };
+        trackEvent("editor_processing_started", processingProperties);
 
         try {
             setCurrentJob((prev) =>
@@ -484,6 +519,10 @@ export default function Editor() {
                 if (attempts === 1) {
                     const previewLoaded = await preloadImage(previewUrl);
                     if (previewLoaded) {
+                        trackEvent("editor_preview_loaded", {
+                            ...processingProperties,
+                            preview_url: previewUrl,
+                        });
                         setProcessedImage(previewUrl);
                     }
                 }
@@ -492,7 +531,7 @@ export default function Editor() {
 
                 if (loaded) {
                     trackEvent("editor_processing_completed", {
-                        tool_id: toolId,
+                        ...processingProperties,
                         duration_ms: Math.round(performance.now() - startedAt),
                         attempts,
                     });
@@ -529,7 +568,7 @@ export default function Editor() {
 
                 if (attempts >= maxAttempts) {
                     trackEvent("editor_processing_unconfirmed", {
-                        tool_id: toolId,
+                        ...processingProperties,
                         reason: "poll_timeout",
                         duration_ms: Math.round(performance.now() - startedAt),
                         attempts,
@@ -564,7 +603,8 @@ export default function Editor() {
             await pollImageKit();
         } catch (err) {
             trackEvent("editor_processing_failed", {
-                tool_id: toolId,
+                ...processingProperties,
+                error: err instanceof Error ? err.message : String(err),
                 duration_ms: Math.round(performance.now() - startedAt),
             });
             console.error("Error applying effect:", err);
@@ -580,15 +620,21 @@ export default function Editor() {
         const downloadUrl = processedImageHQ || processedImage;
         if (!downloadUrl) return;
         const startedAt = performance.now();
-        trackEvent("image_export_started", {
+        const exportProperties = {
             format,
+            image_url: downloadUrl,
+            original_image_url: uploadedImage,
             active_effects: Array.from(activeEffects),
+            prompts: effectPrompts,
+        };
+        trackEvent("image_export_started", {
+            ...exportProperties,
         });
         try {
             const response = await fetch(downloadUrl);
             if (!response.ok) {
                 trackEvent("image_export_failed", {
-                    format,
+                    ...exportProperties,
                     reason: "http_error",
                     status_code: response.status,
                 });
@@ -610,7 +656,7 @@ export default function Editor() {
             const contentType = response.headers.get("content-type") || "";
             if (!contentType.startsWith("image/")) {
                 trackEvent("image_export_failed", {
-                    format,
+                    ...exportProperties,
                     reason: "unexpected_response",
                 });
                 const errorText = await response.text();
@@ -620,16 +666,19 @@ export default function Editor() {
                 return;
             }
             const blob = await response.blob();
-            saveAs(blob, `PixSuite-${Date.now()}.${format}`);
+            const fileName = `PixSuite-${Date.now()}.${format}`;
+            saveAs(blob, fileName);
             trackEvent("image_export_completed", {
-                format,
+                ...exportProperties,
+                file_name: fileName,
+                content_type: contentType,
                 size_bytes: blob.size,
                 duration_ms: Math.round(performance.now() - startedAt),
-                active_effects: Array.from(activeEffects),
             });
         } catch (err) {
             trackEvent("image_export_failed", {
-                format,
+                ...exportProperties,
+                error: err instanceof Error ? err.message : String(err),
                 reason: "network_error",
             });
             console.error("Export error:", err);
@@ -647,6 +696,10 @@ export default function Editor() {
             updated.add(label);
         }
         setCollapsedCategories(updated);
+        trackEvent("editor_category_toggled", {
+            category: label,
+            expanded: !updated.has(label),
+        });
     };
 
     const isProcessing = currentJob?.status === "processing";
@@ -821,11 +874,20 @@ export default function Editor() {
                                             </div>
                                             <textarea
                                                 value={promptText}
-                                                onChange={(e) =>
+                                                onChange={(e) => {
                                                     setPromptText(
                                                         e.target.value,
-                                                    )
-                                                }
+                                                    );
+                                                    trackEvent(
+                                                        "editor_prompt_changed",
+                                                        {
+                                                            tool_id:
+                                                                promptToolId,
+                                                            prompt: e.target
+                                                                .value,
+                                                        },
+                                                    );
+                                                }}
                                                 placeholder="e.g., Replace background with a sunset beach..."
                                                 className="w-full p-3 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
                                                 rows={3}
@@ -845,6 +907,14 @@ export default function Editor() {
                                                 <Button
                                                     variant="outline"
                                                     onClick={() => {
+                                                        trackEvent(
+                                                            "editor_prompt_cancelled",
+                                                            {
+                                                                tool_id:
+                                                                    promptToolId,
+                                                                prompt: promptText,
+                                                            },
+                                                        );
                                                         setShowPromptInput(
                                                             false,
                                                         );
