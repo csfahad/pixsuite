@@ -1,4 +1,8 @@
-import posthog, { type CaptureResult, type PostHogConfig } from "posthog-js";
+import posthog, {
+    type CaptureResult,
+    type CapturedNetworkRequest,
+    type PostHogConfig,
+} from "posthog-js";
 import type { PlanType } from "./plans";
 
 const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
@@ -6,6 +10,12 @@ const enabled = process.env.NEXT_PUBLIC_POSTHOG_ENABLED !== "false";
 const replayEnabled =
     process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY !== "false";
 let initialized = false;
+const replayOverrides = {
+    sampling: true,
+    linked_flag: true,
+    url_trigger: true,
+    event_trigger: true,
+} as const;
 
 export type AnalyticsEvent =
     | "user_identified"
@@ -16,6 +26,15 @@ export type AnalyticsEvent =
     | "image_upload_failed"
     | "image_upload_blocked"
     | "image_cleared"
+    | "image_picker_opened"
+    | "editor_image_loaded"
+    | "editor_prompt_opened"
+    | "editor_prompt_changed"
+    | "editor_prompt_cancelled"
+    | "editor_category_toggled"
+    | "editor_credits_deducted"
+    | "editor_preview_loaded"
+    | "editor_comparison_adjusted"
     | "editor_tool_selected"
     | "editor_tool_blocked"
     | "editor_effect_removed"
@@ -31,6 +50,11 @@ export type AnalyticsEvent =
     | "plan_selected"
     | "upgrade_modal_viewed"
     | "checkout_started"
+    | "checkout_order_created"
+    | "checkout_payment_failed"
+    | "checkout_sdk_loaded"
+    | "checkout_sdk_failed"
+    | "upgrade_modal_closed"
     | "checkout_opened"
     | "checkout_submitted"
     | "checkout_completed"
@@ -38,12 +62,17 @@ export type AnalyticsEvent =
     | "checkout_cancelled"
     | "account_tab_selected"
     | "account_profile_updated"
+    | "account_loaded"
+    | "account_load_failed"
+    | "account_profile_edit_started"
+    | "account_profile_edit_cancelled"
+    | "account_profile_update_failed"
+    | "navigation_menu_toggled"
+    | "user_menu_toggled"
+    | "navigation_selected"
     | "theme_changed";
 
-type EventProperties = Record<
-    string,
-    string | number | boolean | string[] | undefined
->;
+type EventProperties = Record<string, unknown>;
 
 const redirectEvents = new Set<AnalyticsEvent>([
     "sign_in_started",
@@ -52,13 +81,20 @@ const redirectEvents = new Set<AnalyticsEvent>([
     "checkout_submitted",
     "checkout_failed",
     "checkout_cancelled",
+    "checkout_payment_failed",
 ]);
+
+const credentialKey =
+    /^(?:authorization|proxyauthorization|cookie|setcookie|password|passwd|csrftoken|accesstoken|refreshtoken|idtoken|clientsecret|privatekey|apikey|secret|signature|razorpaysignature|token)$/i;
+const isCredentialKey = (key: string) =>
+    credentialKey.test(key.replace(/[-_]/g, ""));
 
 export function analyticsUrl(value: string): string {
     try {
         const url = new URL(value, "https://pixsuite.csfahad.in");
-        url.search = "";
-        url.hash = "";
+        for (const key of Array.from(url.searchParams.keys())) {
+            if (isCredentialKey(key)) url.searchParams.delete(key);
+        }
         url.username = "";
         url.password = "";
         return url.toString();
@@ -67,40 +103,95 @@ export function analyticsUrl(value: string): string {
     }
 }
 
+function analyticsProperties(value: unknown, key = ""): unknown {
+    if (typeof value === "string" && /(?:url|referrer|href)$/i.test(key)) {
+        return analyticsUrl(value);
+    }
+    if (Array.isArray(value)) {
+        return value.map((item) => analyticsProperties(item, key));
+    }
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(
+        Object.entries(value)
+            .filter(([name]) => !isCredentialKey(name))
+            .map(([name, item]) => [name, analyticsProperties(item, name)]),
+    );
+}
+
 export function sanitizeAnalyticsEvent(
     event: CaptureResult | null,
 ): CaptureResult | null {
     if (!event) return null;
-    const scrub = (value: unknown, key = ""): unknown => {
-        if (typeof value === "string") {
-            return /(?:url|referrer|href)$/i.test(key) ||
-                /^https?:\/\//i.test(value)
-                ? analyticsUrl(value)
-                : value;
-        }
-        if (Array.isArray(value)) return value.map((item) => scrub(item));
-        if (value && typeof value === "object") {
-            const result: Record<string, unknown> = {};
-            for (const [name, item] of Object.entries(value)) {
-                const safeName = /^https?:\/\//i.test(name)
-                    ? analyticsUrl(name)
-                    : name;
-                const safeItem = scrub(item, name);
-                const previous = result[safeName];
-                result[safeName] =
-                    Array.isArray(previous) && Array.isArray(safeItem)
-                        ? [...previous, ...safeItem]
-                        : safeItem;
-            }
-            return result;
-        }
-        return value;
-    };
-    event.properties = scrub(event.properties) as CaptureResult["properties"];
-    if (event.$set) event.$set = scrub(event.$set) as CaptureResult["$set"];
+    const ingestionToken = event.properties.token;
+    event.properties = analyticsProperties(
+        event.properties,
+    ) as CaptureResult["properties"];
+    if (
+        typeof ingestionToken === "string" &&
+        ingestionToken === projectToken?.trim()
+    ) {
+        event.properties.token = ingestionToken;
+    }
+    if (event.$set)
+        event.$set = analyticsProperties(event.$set) as CaptureResult["$set"];
     if (event.$set_once)
-        event.$set_once = scrub(event.$set_once) as CaptureResult["$set_once"];
+        event.$set_once = analyticsProperties(
+            event.$set_once,
+        ) as CaptureResult["$set_once"];
     return event;
+}
+
+export function captureAnalyticsNetworkRequest(
+    request: CapturedNetworkRequest,
+): CapturedNetworkRequest {
+    const captured = { ...request, name: analyticsUrl(request.name) };
+    for (const key of ["requestHeaders", "responseHeaders"] as const) {
+        if (captured[key]) {
+            captured[key] = analyticsProperties(
+                captured[key],
+            ) as (typeof captured)[typeof key];
+        }
+    }
+    for (const key of ["requestBody", "responseBody"] as const) {
+        const body = captured[key];
+        if (!body) continue;
+        try {
+            captured[key] = JSON.stringify(
+                analyticsProperties(JSON.parse(body)),
+            );
+        } catch {
+            const headers =
+                captured[
+                    key === "requestBody" ? "requestHeaders" : "responseHeaders"
+                ];
+            const contentType = Object.entries(headers ?? {}).find(
+                ([name]) => name.toLowerCase() === "content-type",
+            )?.[1];
+            if (
+                contentType?.includes("multipart/form-data") &&
+                /boundary=/i.test(contentType) &&
+                body.includes("\n")
+            ) {
+                captured[key] = body.replace(
+                    /(name="([^"]+)"[^\r\n]*\r?\n(?:[^\r\n]+\r?\n)*\r?\n)([\s\S]*?)(?=\r?\n--)/g,
+                    (part, prefix, name) =>
+                        isCredentialKey(name)
+                            ? `${prefix}[credential removed]`
+                            : part,
+                );
+            } else if (
+                contentType?.includes("application/x-www-form-urlencoded") ||
+                contentType?.includes("multipart/form-data")
+            ) {
+                const form = new URLSearchParams(body);
+                for (const name of Array.from(form.keys())) {
+                    if (isCredentialKey(name)) form.delete(name);
+                }
+                captured[key] = form.toString();
+            }
+        }
+    }
+    return captured;
 }
 
 export function getAnalyticsConfig(): Partial<PostHogConfig> {
@@ -108,49 +199,64 @@ export function getAnalyticsConfig(): Partial<PostHogConfig> {
         api_host: "/ingest",
         ui_host: "https://us.posthog.com",
         defaults: "2026-08-30",
-        debug: false,
+        debug: process.env.NODE_ENV === "development",
         capture_pageview: "history_change",
         capture_pageleave: true,
-        autocapture: { capture_copied_text: false },
+        disable_capture_url_hashes: false,
+        mask_personal_data_properties: false,
+        autocapture: {
+            capture_copied_text: true,
+            capture_value_css_selector_allowlist: [
+                "input",
+                "textarea",
+                "select",
+            ],
+        },
+        capture_heatmaps: true,
+        capture_dead_clicks: true,
         disable_surveys: true,
         disable_conversations: true,
         disable_product_tours: true,
         person_profiles: "identified_only",
         opt_out_useragent_filter: process.env.NODE_ENV !== "production",
-        mask_all_text: true,
-        mask_all_element_attributes: true,
+        mask_all_text: false,
+        mask_all_element_attributes: false,
         disable_session_recording: !replayEnabled,
-        enable_recording_console_log: false,
-        capture_exceptions: false,
-        capture_performance: { web_vitals: true, network_timing: false },
+        enable_recording_console_log: true,
+        capture_exceptions: true,
+        capture_performance: { web_vitals: true, network_timing: true },
         session_recording: {
-            maskAllInputs: true,
-            blockClass: "ph-no-capture",
-            blockSelector:
-                '[data-ph-private], .razorpay-container, iframe, canvas, input[type="file"], [data-slot="avatar"], [data-sonner-toast]',
-            maskTextSelector: '[data-ph-mask], [contenteditable="true"]',
-            recordHeaders: false,
-            recordBody: false,
-            captureJsonLd: false,
-            recordCrossOriginIframes: false,
-            captureCanvas: { recordCanvas: false },
-            maskCapturedNetworkRequestFn: (request) => {
-                if (
-                    Object.keys(request).length === 1 &&
-                    typeof request.name === "string"
-                ) {
-                    return { ...request, name: analyticsUrl(request.name) };
-                }
-                return null;
+            maskAllInputs: false,
+            maskAllElementAttributes: false,
+            blockClass: /$^/,
+            ignoreClass: /$^/,
+            maskTextClass: /$^/,
+            // Explicit no-match selectors override project settings. null would
+            // fall back to the project's masking and blocking selectors.
+            blockSelector: ":not(*)",
+            maskTextSelector: ":not(*)",
+            maskInputOptions: { password: true },
+            recordHeaders: true,
+            recordBody: true,
+            streamNetworkBody: true,
+            captureJsonLd: true,
+            collectFonts: true,
+            inlineStylesheet: true,
+            recordCrossOriginIframes: true,
+            captureCanvas: {
+                recordCanvas: true,
+                canvasFps: 4,
+                canvasQuality: "1",
             },
+            maskCapturedNetworkRequestFn: captureAnalyticsNetworkRequest,
         },
         before_send: sanitizeAnalyticsEvent,
         get_current_url: analyticsUrl,
         loaded: (client) => {
-            client.register({
-                app: "pixsuite",
-                environment: process.env.NODE_ENV,
-            });
+            // Remove the old custom label from returning browsers' persistence.
+            client.unregister("environment");
+            client.register({ app: "pixsuite" });
+            if (replayEnabled) client.startSessionRecording(replayOverrides);
         },
     };
 }
@@ -202,20 +308,41 @@ export function trackEvent(
     }
 }
 
+export function getAnalyticsSessionId(): string | undefined {
+    if (!canCapture()) return;
+    try {
+        return posthog.get_session_id();
+    } catch {
+        /* Checkout must work even when analytics is unavailable. */
+    }
+}
+
 export function resetAnalyticsIdentity(): void {
     if (!canCapture()) return;
     try {
         posthog.reset();
-        posthog.register({
-            app: "pixsuite",
-            environment: process.env.NODE_ENV,
-        });
+        posthog.register({ app: "pixsuite" });
+        if (replayEnabled) posthog.startSessionRecording(replayOverrides);
     } catch {
         /* Authentication must work even when analytics is unavailable. */
     }
 }
 
-export function syncAnalyticsIdentity(userId: string | null): void {
+export function updateAnalyticsProfile(properties: EventProperties): void {
+    if (!canCapture()) return;
+    try {
+        if (posthog.get_property("pixsuite_user_id")) {
+            posthog.setPersonProperties(properties);
+        }
+    } catch {
+        /* Profile edits must not depend on analytics. */
+    }
+}
+
+export function syncAnalyticsIdentity(
+    userId: string | null,
+    profile: EventProperties = {},
+): void {
     if (!canCapture()) return;
     try {
         const previousUserId = posthog.get_property("pixsuite_user_id");
@@ -223,10 +350,13 @@ export function syncAnalyticsIdentity(userId: string | null): void {
             if (previousUserId) resetAnalyticsIdentity();
             return;
         }
-        if (previousUserId === userId) return;
+        if (previousUserId === userId) {
+            updateAnalyticsProfile(profile);
+            return;
+        }
         // Never merge two accounts that happen to use the same browser.
         if (previousUserId) resetAnalyticsIdentity();
-        posthog.identify(userId, { auth_provider: "google" });
+        posthog.identify(userId, { auth_provider: "google", ...profile });
         posthog.register({ pixsuite_user_id: userId, is_authenticated: true });
         trackEvent("user_identified", { auth_provider: "google" });
     } catch {
