@@ -1,14 +1,15 @@
 "use client";
+import { BrandMark } from "@/components/brand/logo";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useAppRouter as useRouter } from "@/components/navigation-feedback";
+import { useSearchParams } from "next/navigation";
 import {
     setAnalyticsPlan,
     trackEvent,
     updateAnalyticsProfile,
 } from "@/lib/analytics";
-import { motion, AnimatePresence } from "motion/react";
 import {
     User,
     CreditCard,
@@ -21,7 +22,6 @@ import {
     Star,
     ArrowUpRight,
     Check,
-    Loader2,
     Pencil,
     X,
     ChevronRight,
@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PageLoading, LoadingState } from "@/components/loading-state";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -122,13 +123,7 @@ const planConfig: Record<
 
 export default function AccountPage() {
     return (
-        <Suspense
-            fallback={
-                <div className="min-h-screen flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-                </div>
-            }
-        >
+        <Suspense fallback={<PageLoading label="Loading account…" />}>
             <AccountPageContent />
         </Suspense>
     );
@@ -144,6 +139,7 @@ function AccountPageContent() {
     );
     const [userData, setUserData] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [editingName, setEditingName] = useState(false);
     const [newName, setNewName] = useState("");
     const [saving, setSaving] = useState(false);
@@ -159,6 +155,7 @@ function AccountPageContent() {
     const fetchUserData = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const res = await fetch("/api/account");
             if (res.status === 401) {
                 router.replace("/");
@@ -173,12 +170,14 @@ function AccountPageContent() {
                 setNewName(data.name);
             } else {
                 trackEvent("account_load_failed", { status_code: res.status });
+                setLoadError("Your account couldn’t load. Try again.");
             }
         } catch (err) {
             trackEvent("account_load_failed", {
                 error: err instanceof Error ? err.message : String(err),
             });
             console.error("Failed to fetch account data:", err);
+            setLoadError("Your account couldn’t load. Try again.");
         } finally {
             setLoading(false);
         }
@@ -308,49 +307,36 @@ function AccountPageContent() {
 
     if (sessionStatus === "loading" || sessionStatus === "unauthenticated") {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{
-                        repeat: Infinity,
-                        duration: 1,
-                        ease: "linear",
-                    }}
-                >
-                    <Loader2 className="h-8 w-8 text-muted-foreground" />
-                </motion.div>
-            </div>
+            <PageLoading
+                label={
+                    sessionStatus === "loading"
+                        ? "Checking your session…"
+                        : "Opening PixSuite…"
+                }
+            />
         );
     }
 
     return (
         <TooltipProvider>
+            {saving && <LoadingState label="Saving your account…" />}
             <div className="min-h-screen bg-background pt-28 pb-12">
                 {/* Page header */}
                 <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 mb-8">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                    >
+                    <div>
                         <h1 className="text-3xl font-bold text-foreground">
                             Account Settings
                         </h1>
                         <p className="text-muted-foreground mt-1">
                             Manage your account settings and billing preferences
                         </p>
-                    </motion.div>
+                    </div>
                 </div>
 
                 <div className="w-full max-w-7xl mx-auto px-6 lg:px-16">
                     <div className="flex flex-col md:flex-row gap-8">
                         {/* Sidebar */}
-                        <motion.aside
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.5, delay: 0.1 }}
-                            className="md:w-[220px] shrink-0"
-                        >
+                        <aside className="md:w-[220px] shrink-0">
                             {/* Mobile: horizontal tabs */}
                             <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
                                 {tabs.map((tab) => {
@@ -361,7 +347,7 @@ function AccountPageContent() {
                                             onClick={() =>
                                                 handleTabChange(tab.id)
                                             }
-                                            className={`relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap cursor-pointer
+                                            className={`relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium   whitespace-nowrap cursor-pointer
                                                 ${
                                                     isActive
                                                         ? "text-foreground"
@@ -369,15 +355,7 @@ function AccountPageContent() {
                                                 }`}
                                         >
                                             {isActive && (
-                                                <motion.div
-                                                    layoutId="activeTab"
-                                                    className="absolute inset-0 bg-muted rounded-lg"
-                                                    transition={{
-                                                        type: "spring",
-                                                        stiffness: 380,
-                                                        damping: 30,
-                                                    }}
-                                                />
+                                                <div className="absolute inset-0 bg-muted rounded-lg" />
                                             )}
                                             <span className="relative z-10 flex items-center gap-3">
                                                 <tab.icon className="h-4 w-4" />
@@ -387,32 +365,34 @@ function AccountPageContent() {
                                     );
                                 })}
                             </nav>
-                        </motion.aside>
+                        </aside>
 
                         {/* Content */}
-                        <motion.main
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, delay: 0.2 }}
-                            className="flex-1 min-w-0"
-                        >
-                            <AnimatePresence mode="wait">
+                        <main className="flex-1 min-w-0">
+                            <>
                                 {loading ? (
-                                    <motion.div
-                                        key="loading"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        className="space-y-6"
-                                    >
+                                    <div key="loading" className="space-y-6">
+                                        <LoadingState
+                                            label="Loading your account…"
+                                            className="justify-start"
+                                        />
                                         {/* Skeleton */}
                                         {[1, 2, 3].map((i) => (
                                             <div
                                                 key={i}
-                                                className="h-32 rounded-xl bg-muted/50 animate-pulse"
+                                                className="h-32 rounded-xl bg-muted/50 "
                                             />
                                         ))}
-                                    </motion.div>
+                                    </div>
+                                ) : loadError ? (
+                                    <div role="alert" className="space-y-4">
+                                        <p className="text-sm text-destructive">
+                                            {loadError}
+                                        </p>
+                                        <Button onClick={fetchUserData}>
+                                            Try again
+                                        </Button>
+                                    </div>
                                 ) : activeTab === "account" ? (
                                     <AccountTab
                                         key="account"
@@ -460,8 +440,8 @@ function AccountPageContent() {
                                         formatDate={formatDate}
                                     />
                                 )}
-                            </AnimatePresence>
-                        </motion.main>
+                            </>
+                        </main>
                     </div>
                 </div>
             </div>
@@ -503,26 +483,13 @@ function AccountTab({
     if (!userData) return null;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-        >
+        <div className="space-y-6">
             {/* Profile header card */}
             <Card className="border-border/50 overflow-hidden">
                 <div className="h-24 bg-linear-to-br from-primary/10 via-primary/5 to-transparent" />
                 <CardContent className="relative pt-0 -mt-12 px-6 pb-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-                        <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            transition={{
-                                type: "spring",
-                                stiffness: 400,
-                                damping: 17,
-                            }}
-                        >
+                        <div>
                             <Avatar className="h-20 w-20 border-4 border-background shadow-lg">
                                 <AvatarImage
                                     src={profileImage}
@@ -533,7 +500,7 @@ function AccountTab({
                                     {getInitials(userData.name)}
                                 </AvatarFallback>
                             </Avatar>
-                        </motion.div>
+                        </div>
                         <div className="flex-1 pt-2 sm:pt-0 sm:pb-1">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h2 className="text-xl font-semibold text-foreground">
@@ -595,15 +562,17 @@ function AccountTab({
                                                 className="h-8 text-sm max-w-[240px]"
                                                 autoFocus
                                                 disabled={saving}
+                                                aria-busy={saving}
                                             />
                                             <Button
                                                 size="sm"
                                                 onClick={handleSaveName}
                                                 disabled={saving}
+                                                aria-busy={saving}
                                                 className="h-8 px-3 cursor-pointer"
                                             >
                                                 {saving ? (
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    <BrandMark className="h-3 w-3 " />
                                                 ) : (
                                                     <Check className="h-3 w-3" />
                                                 )}
@@ -618,6 +587,7 @@ function AccountTab({
                                                 }}
                                                 className="h-8 px-2 cursor-pointer"
                                                 disabled={saving}
+                                                aria-busy={saving}
                                             >
                                                 <X className="h-3 w-3" />
                                             </Button>
@@ -627,41 +597,19 @@ function AccountTab({
                                             {userData.name}
                                         </p>
                                     )}
-                                    <AnimatePresence>
+                                    <>
                                         {saveError && (
-                                            <motion.p
-                                                initial={{
-                                                    opacity: 0,
-                                                    height: 0,
-                                                }}
-                                                animate={{
-                                                    opacity: 1,
-                                                    height: "auto",
-                                                }}
-                                                exit={{ opacity: 0, height: 0 }}
-                                                className="text-xs text-destructive mt-1"
-                                            >
+                                            <p className="text-xs text-destructive mt-1">
                                                 {saveError}
-                                            </motion.p>
+                                            </p>
                                         )}
                                         {saveSuccess && (
-                                            <motion.p
-                                                initial={{
-                                                    opacity: 0,
-                                                    height: 0,
-                                                }}
-                                                animate={{
-                                                    opacity: 1,
-                                                    height: "auto",
-                                                }}
-                                                exit={{ opacity: 0, height: 0 }}
-                                                className="text-xs text-emerald-500 mt-1 flex items-center gap-1"
-                                            >
+                                            <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1">
                                                 <Check className="h-3 w-3" />
                                                 Name updated successfully
-                                            </motion.p>
+                                            </p>
                                         )}
-                                    </AnimatePresence>
+                                    </>
                                 </div>
                             </div>
                             {!editingName && (
@@ -742,7 +690,7 @@ function AccountTab({
                     </CardContent>
                 </Card>
             </div>
-        </motion.div>
+        </div>
     );
 }
 
@@ -769,13 +717,7 @@ function PlanTab({
     const PlanIcon = plan.icon;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-        >
+        <div className="space-y-6">
             {/* Current plan card */}
             <Card className={`border-border/50 overflow-hidden`}>
                 <div
@@ -792,17 +734,11 @@ function PlanTab({
                 <CardContent className="p-6">
                     <div className="flex items-start justify-between">
                         <div className="flex items-center gap-4">
-                            <motion.div
-                                whileHover={{ rotate: 15, scale: 1.1 }}
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 400,
-                                    damping: 10,
-                                }}
+                            <div
                                 className={`h-14 w-14 rounded-xl ${plan.bg} flex items-center justify-center`}
                             >
                                 <PlanIcon className={`h-7 w-7 ${plan.color}`} />
-                            </motion.div>
+                            </div>
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-lg font-semibold text-foreground">
@@ -832,7 +768,7 @@ function PlanTab({
                                         document.getElementById("pricing");
                                     if (el) {
                                         el.scrollIntoView({
-                                            behavior: "smooth",
+                                            behavior: "instant",
                                         });
                                     } else {
                                         window.location.href = "/#pricing";
@@ -968,17 +904,12 @@ function PlanTab({
                         </div>
 
                         <div className="space-y-2">
-                            <motion.div
-                                initial={{ scaleX: 0 }}
-                                animate={{ scaleX: 1 }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
-                                style={{ transformOrigin: "left" }}
-                            >
+                            <div style={{ transformOrigin: "left" }}>
                                 <Progress
                                     value={creditPercentage}
                                     className="h-2.5"
                                 />
-                            </motion.div>
+                            </div>
                             <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>
                                     {creditsRemaining.toLocaleString()}{" "}
@@ -1037,17 +968,12 @@ function PlanTab({
                         </div>
 
                         <div className="space-y-2">
-                            <motion.div
-                                initial={{ scaleX: 0 }}
-                                animate={{ scaleX: 1 }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
-                                style={{ transformOrigin: "left" }}
-                            >
+                            <div style={{ transformOrigin: "left" }}>
                                 <Progress
                                     value={uploadPercentage}
                                     className="h-2.5"
                                 />
-                            </motion.div>
+                            </div>
                             <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>
                                     {uploadsRemaining.toLocaleString()}{" "}
@@ -1097,14 +1023,8 @@ function PlanTab({
                             color: plan.color,
                             bg: plan.bg,
                         },
-                    ].map((stat, i) => (
-                        <motion.div
-                            key={stat.label}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, delay: i * 0.1 }}
-                            whileHover={{ y: -2 }}
-                        >
+                    ].map((stat) => (
+                        <div key={stat.label}>
                             <Card className="border-border/50 h-full">
                                 <CardContent className="p-5">
                                     <div className="flex items-center gap-3 mb-3">
@@ -1124,18 +1044,14 @@ function PlanTab({
                                     </p>
                                 </CardContent>
                             </Card>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             </div>
 
             {/* Upgrade CTA */}
             {userData.plan !== "Pro" && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.3 }}
-                >
+                <div>
                     <Card className="border-border/50 overflow-hidden">
                         <div className="bg-linear-to-br from-primary/5 via-transparent to-primary/5 p-6">
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1167,8 +1083,8 @@ function PlanTab({
                             </div>
                         </div>
                     </Card>
-                </motion.div>
+                </div>
             )}
-        </motion.div>
+        </div>
     );
 }
