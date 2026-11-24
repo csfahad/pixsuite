@@ -1,27 +1,17 @@
 import { createHmac } from "node:crypto";
-import { isIP } from "node:net";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "./prisma";
 import { isDatabaseConflict } from "./transaction.server";
 import { RequestError } from "./request-error.server";
+import { forwardedClientIp } from "./forwarded-client-ip.server";
 
 export const ANONYMOUS_COOKIE = "pixsuite-anon";
 
 export function clientIp(request: NextRequest): string | null {
-    const trusted =
-        process.env.NODE_ENV !== "production" ||
-        process.env.VERCEL === "1" ||
-        process.env.TRUST_PROXY_HEADERS === "true";
-    if (!trusted) return null;
-    const value = (
-        request.headers.get("x-vercel-forwarded-for") ||
-        request.headers.get("x-forwarded-for") ||
-        request.headers.get("x-real-ip")
-    )
-        ?.split(",")[0]
-        .trim();
-    if (value && isIP(value)) return value;
-    return process.env.NODE_ENV === "production" ? null : "127.0.0.1";
+    return (
+        forwardedClientIp(request) ??
+        (process.env.NODE_ENV === "production" ? null : "127.0.0.1")
+    );
 }
 
 export async function anonymousSession(request: NextRequest) {
