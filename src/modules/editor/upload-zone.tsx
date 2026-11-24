@@ -1,8 +1,10 @@
+import { BrandMark } from "@/components/brand/logo";
+import { LoadingState } from "@/components/loading-state";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useAppRouter as useRouter } from "@/components/navigation-feedback";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { AnimatePresence, motion } from "motion/react";
-import { Crown, ImageIcon, Loader2, Upload, X, Zap } from "lucide-react";
+import { Crown, ImageIcon, Upload, X, Zap } from "lucide-react";
 import {
     ImageKitInvalidRequestError,
     ImageKitServerError,
@@ -18,6 +20,7 @@ import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
 interface UploadZoneProps {
     onImageUpload: (imageUrl: string) => void;
     updatedCreditsRemaining?: number;
+    busy?: boolean;
 }
 
 interface UsageData {
@@ -42,6 +45,7 @@ interface UploadAuthData {
 export default function UploadZone({
     onImageUpload,
     updatedCreditsRemaining,
+    busy = false,
 }: UploadZoneProps) {
     const { data: session, status } = useSession();
     const isAuthenticated = !!session?.user;
@@ -56,29 +60,50 @@ export default function UploadZone({
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [checkingUsage, setCheckingUsage] = useState(true);
+    const [usageError, setUsageError] = useState<string | null>(null);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [usageData, setUsageData] = useState<UsageData | null>(null);
 
     const checkUsage = useCallback(async () => {
-        const response = await fetch("/api/usage");
-        if (!response.ok) {
-            throw new Error("Failed to check usage");
+        setCheckingUsage(true);
+        setUsageError(null);
+        try {
+            const response = await fetch("/api/usage");
+            if (!response.ok) {
+                throw new Error("Failed to check usage");
+            }
+            const data = await response.json();
+            setUsageData(data);
+            setAnalyticsPlan(data.plan as PlanType);
+            return data;
+        } catch (error) {
+            setUsageError("Access check failed. You can try again.");
+            throw error;
+        } finally {
+            setCheckingUsage(false);
         }
-        const data = await response.json();
-        setUsageData(data);
-        setAnalyticsPlan(data.plan as PlanType);
-        return data;
     }, []);
 
     const checkFreeUsage = useCallback(async () => {
-        const response = await fetch("/api/free-usage");
-        if (!response.ok) {
-            throw new Error("Failed to check free usage");
+        setCheckingUsage(true);
+        setUsageError(null);
+        try {
+            const response = await fetch("/api/free-usage");
+            if (!response.ok) {
+                throw new Error("Failed to check free usage");
+            }
+            const data = await response.json();
+            setUsageData(data);
+            setAnalyticsPlan("Free");
+            return data;
+        } catch (error) {
+            setUsageError("Access check failed. You can try again.");
+            throw error;
+        } finally {
+            setCheckingUsage(false);
         }
-        const data = await response.json();
-        setUsageData(data);
-        setAnalyticsPlan("Free");
-        return data;
     }, []);
 
     useEffect(() => {
@@ -198,7 +223,14 @@ export default function UploadZone({
         files: File[],
         source: "drag_drop" | "file_picker",
     ) => {
-        if (uploadInFlight.current || status === "loading") return;
+        if (
+            uploadInFlight.current ||
+            status === "loading" ||
+            checkingUsage ||
+            busy
+        )
+            return;
+        setUploadError(null);
         const imageFile = files?.find((file) => file.type.startsWith("image/"));
         if (imageFile) {
             const startedAt = performance.now();
@@ -237,6 +269,9 @@ export default function UploadZone({
                     duration_ms: Math.round(performance.now() - startedAt),
                 });
                 console.error("Upload failed:", err);
+                setUploadError(
+                    "This photo couldn’t upload. Choose it again to retry.",
+                );
             } finally {
                 uploadInFlight.current = false;
                 setIsUploading(false);
@@ -264,44 +299,38 @@ export default function UploadZone({
         onImageUpload("");
     };
 
-    const uploadPercent = usageData
-        ? (usageData.uploadCount / usageData.uploadLimit) * 100
-        : 0;
-
     return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative"
-        >
-            <AnimatePresence mode="wait">
+        <div className="relative">
+            {(isUploading || checkingUsage) && (
+                <LoadingState
+                    label={
+                        isUploading
+                            ? "Uploading your photo…"
+                            : "Preparing the editor…"
+                    }
+                />
+            )}
+            <>
                 {uploadedImage ? (
                     /* Uploaded Preview */
-                    <motion.div
+                    <div
                         key="preview"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{
-                            type: "spring",
-                            stiffness: 300,
-                            damping: 25,
-                        }}
                         className="relative group rounded-xl overflow-hidden border border-border"
                     >
                         <button
                             onClick={clearImage}
-                            className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-all duration-200 cursor-pointer"
+                            disabled={busy || isUploading}
+                            aria-label="Remove uploaded photo"
+                            className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-destructive/20   cursor-pointer"
                         >
                             <X className="h-3.5 w-3.5 text-foreground hover:text-destructive" />
                         </button>
 
                         <div className="aspect-square overflow-hidden">
-                            <motion.img
+                            <img
                                 src={uploadedImage}
                                 alt="Uploaded Preview"
-                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                whileHover={{ scale: 1.03 }}
+                                className="w-full h-full object-cover   "
                             />
                         </div>
 
@@ -315,30 +344,23 @@ export default function UploadZone({
                                 Pick a tool below
                             </p>
                         </div>
-                    </motion.div>
+                    </div>
                 ) : (
                     /* Drop Zone */
-                    <motion.div
-                        key="dropzone"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                    >
+                    <div key="dropzone">
                         <div
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={handleDrop}
-                            className={`relative rounded-xl p-5 border-2 border-dashed transition-all duration-300 cursor-pointer ${
+                            className={`relative rounded-xl p-5 border-2 border-dashed   cursor-pointer ${
                                 isDragOver
-                                    ? "border-primary bg-primary/5 scale-[1.02]"
+                                    ? "border-primary bg-primary/5"
                                     : "border-border hover:border-primary/40 hover:bg-muted/30"
                             }`}
                         >
                             {/* Animated gradient border on drag */}
                             {isDragOver && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
+                                <div
                                     className="absolute inset-0 rounded-xl pointer-events-none"
                                     style={{
                                         background:
@@ -349,6 +371,12 @@ export default function UploadZone({
 
                             <input
                                 type="file"
+                                disabled={
+                                    isUploading ||
+                                    checkingUsage ||
+                                    status === "loading" ||
+                                    busy
+                                }
                                 accept="image/*"
                                 onChange={handleFileSelect}
                                 onClick={() =>
@@ -362,49 +390,47 @@ export default function UploadZone({
                                 htmlFor="file-upload"
                                 className="cursor-pointer block text-center relative z-10"
                             >
-                                <motion.div
-                                    animate={
-                                        isDragOver
-                                            ? { scale: 1.1, y: -4 }
-                                            : { scale: 1, y: 0 }
-                                    }
-                                    transition={{
-                                        type: "spring",
-                                        stiffness: 300,
-                                        damping: 20,
-                                    }}
-                                    className="mb-3"
-                                >
+                                <div className="mb-3">
                                     <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-muted mb-2">
                                         {isUploading ? (
-                                            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                            <BrandMark className="w-5 h-5 text-primary " />
                                         ) : isDragOver ? (
-                                            <Upload className="w-5 h-5 text-primary animate-bounce" />
+                                            <Upload className="w-5 h-5 text-primary " />
                                         ) : (
                                             <ImageIcon className="w-5 h-5 text-muted-foreground" />
                                         )}
                                     </div>
-                                </motion.div>
+                                </div>
 
                                 <h3 className="text-sm font-semibold text-foreground mb-1">
                                     {isUploading
-                                        ? "Uploading..."
-                                        : isDragOver
-                                          ? "Drop it!"
-                                          : "Upload Photo"}
+                                        ? "Uploading…"
+                                        : checkingUsage || status === "loading"
+                                          ? "Checking access…"
+                                          : isDragOver
+                                            ? "Drop it!"
+                                            : "Upload Photo"}
                                 </h3>
 
                                 <p className="text-[11px] text-muted-foreground mb-3">
                                     {isUploading
                                         ? "Please wait"
-                                        : "Drag & drop or click"}
+                                        : checkingUsage
+                                          ? "Loading your upload allowance"
+                                          : "Drag & drop or click"}
                                 </p>
 
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     className="text-xs cursor-pointer"
-                                    disabled={isUploading}
+                                    disabled={
+                                        isUploading ||
+                                        checkingUsage ||
+                                        status === "loading" ||
+                                        busy
+                                    }
+                                    aria-busy={isUploading || checkingUsage}
                                     onClick={(e) => {
                                         e.preventDefault();
                                         document
@@ -414,30 +440,49 @@ export default function UploadZone({
                                 >
                                     {isUploading ? (
                                         <>
-                                            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                            <BrandMark className="h-3 w-3 mr-1.5 " />
                                             Uploading...
                                         </>
                                     ) : (
                                         <>
                                             <Upload className="h-3 w-3 mr-1.5" />
-                                            Browse
+                                            {checkingUsage
+                                                ? "Checking access…"
+                                                : "Browse"}
                                         </>
                                     )}
                                 </Button>
                             </label>
+                            {(usageError || uploadError) && (
+                                <div
+                                    role="alert"
+                                    className="mt-3 text-xs text-destructive"
+                                >
+                                    <p>{uploadError || usageError}</p>
+                                    {usageError && (
+                                        <button
+                                            type="button"
+                                            className="min-h-11 underline underline-offset-4"
+                                            onClick={() =>
+                                                (isAuthenticated
+                                                    ? checkUsage()
+                                                    : checkFreeUsage()
+                                                ).catch(() => {})
+                                            }
+                                        >
+                                            Retry access check
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    </motion.div>
+                    </div>
                 )}
-            </AnimatePresence>
+            </>
 
             {/* Usage Info */}
             {usageData && (
-                <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="mt-3 space-y-2"
-                >
+                <div className="mt-3 space-y-2">
                     {/* Upload count */}
                     <div className="flex items-center justify-between text-[10px]">
                         <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -464,14 +509,7 @@ export default function UploadZone({
                     </div>
                     {/* Upload progress bar */}
                     <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                        <motion.div
-                            className="h-full bg-primary rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{
-                                width: `${Math.min(uploadPercent, 100)}%`,
-                            }}
-                            transition={{ duration: 0.6, ease: "easeOut" }}
-                        />
+                        <div className="h-full bg-primary rounded-full" />
                     </div>
 
                     {/* Credit balance (for paid users) */}
@@ -494,7 +532,7 @@ export default function UploadZone({
                     <p className="text-[10px] text-muted-foreground text-center">
                         JPG, PNG, WEBP up to 10MB
                     </p>
-                </motion.div>
+                </div>
             )}
 
             {/* Payment Modal */}
@@ -517,6 +555,6 @@ export default function UploadZone({
                 currentPlan={(usageData?.plan as PlanType) || "Free"}
                 isAuthenticated={isAuthenticated}
             />
-        </motion.div>
+        </div>
     );
 }

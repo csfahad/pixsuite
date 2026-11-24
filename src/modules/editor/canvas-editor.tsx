@@ -1,6 +1,7 @@
+import { BrandMark } from "@/components/brand/logo";
 import { useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { Eye, EyeOff, Loader2, Maximize2 } from "lucide-react";
+import { Eye, EyeOff, Maximize2 } from "lucide-react";
+import { LoadingState } from "@/components/loading-state";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 
@@ -8,12 +9,14 @@ interface CanvasEditorProps {
     originalImage: string | null;
     processedImage: string | null;
     isProcessing: boolean;
+    processingLabel?: string;
 }
 
 export default function CanvasEditor({
     originalImage,
     processedImage,
     isProcessing,
+    processingLabel = "Applying edit…",
 }: CanvasEditorProps) {
     const [showComparison, setShowComparison] = useState(false);
     const [sliderPosition, setSliderPosition] = useState(50);
@@ -40,7 +43,6 @@ export default function CanvasEditor({
     };
 
     const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-        e.preventDefault();
         const touch = e.touches[0];
         const rect = e.currentTarget.getBoundingClientRect();
         const x = touch.clientX - rect.left;
@@ -51,42 +53,20 @@ export default function CanvasEditor({
     if (!originalImage) {
         return (
             <div className="editor-panel aspect-4/3 flex items-center justify-center canvas-checkerboard">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                    className="text-center px-8"
-                >
+                <div className="text-center px-8">
                     {/* Animated icon */}
-                    <motion.div
-                        animate={{
-                            y: [0, -6, 0],
-                        }}
-                        transition={{
-                            duration: 3,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                        }}
-                        className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-muted/80 flex items-center justify-center border border-border"
-                    >
-                        <motion.div
-                            animate={{ rotate: [0, 5, -5, 0] }}
-                            transition={{
-                                duration: 4,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                            }}
-                        >
+                    <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-muted/80 flex items-center justify-center border border-border">
+                        <div>
                             <Maximize2 className="w-8 h-8 text-muted-foreground" />
-                        </motion.div>
-                    </motion.div>
+                        </div>
+                    </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">
                         Ready for Magic
                     </h3>
                     <p className="text-sm text-muted-foreground max-w-[240px] mx-auto leading-relaxed">
                         Upload a photo from the sidebar to start editing with AI
                     </p>
-                </motion.div>
+                </div>
             </div>
         );
     }
@@ -94,56 +74,21 @@ export default function CanvasEditor({
     return (
         <div className="space-y-3">
             {/* Canvas Container */}
-            <motion.div
-                layout
-                className="relative editor-panel overflow-hidden aspect-4/3"
-            >
+            <div className="relative editor-panel overflow-hidden aspect-4/3">
                 {/* Processing Overlay */}
-                <AnimatePresence>
+                <>
                     {isProcessing && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-background/60 backdrop-blur-md z-10 flex items-center justify-center"
-                        >
-                            <div className="text-center">
-                                {/* Pulsing rings */}
-                                <div className="relative w-16 h-16 mx-auto mb-4">
-                                    <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
-                                    <div
-                                        className="absolute inset-2 rounded-full border-2 border-primary/30 animate-ping"
-                                        style={{ animationDelay: "0.3s" }}
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <Loader2 className="w-7 h-7 text-primary animate-spin" />
-                                    </div>
-                                </div>
-                                <motion.p
-                                    initial={{ opacity: 0, y: 5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="text-foreground font-medium"
-                                >
-                                    AI is working its magic...
-                                </motion.p>
-                                <motion.p
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 0.4 }}
-                                    className="text-sm text-muted-foreground mt-1"
-                                >
-                                    This usually takes a few seconds
-                                </motion.p>
-                            </div>
-                        </motion.div>
+                        <div className="absolute inset-0 bg-background/60 backdrop-blur-md z-10 flex items-center justify-center">
+                            <LoadingState label={processingLabel} />
+                        </div>
                     )}
-                </AnimatePresence>
+                </>
 
                 {showComparison && processedImage ? (
                     /* Before/After Comparison */
                     <div
                         className="relative w-full h-full cursor-ew-resize select-none"
+                        style={{ touchAction: "pan-y" }}
                         onMouseMove={handleSliderMove}
                         onClick={handleSliderClick}
                         onTouchMove={handleTouchMove}
@@ -182,17 +127,11 @@ export default function CanvasEditor({
                         </div>
 
                         {/* Slider Line */}
-                        <motion.div
+                        <div
                             className="absolute top-0 bottom-0 w-0.5 bg-foreground/80"
                             style={{
                                 left: `${sliderPosition}%`,
                                 transform: "translateX(-50%)",
-                            }}
-                            animate={{ left: `${sliderPosition}%` }}
-                            transition={{
-                                type: "spring",
-                                stiffness: 600,
-                                damping: 40,
                             }}
                         >
                             {/* Slider Handle */}
@@ -202,7 +141,7 @@ export default function CanvasEditor({
                                     <div className="w-0.5 h-4 bg-background rounded-full" />
                                 </div>
                             </div>
-                        </motion.div>
+                        </div>
 
                         {/* Labels */}
                         <div className="absolute bottom-4 left-4 px-2.5 py-1 rounded-md bg-foreground/80 text-background text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm">
@@ -214,17 +153,9 @@ export default function CanvasEditor({
                     </div>
                 ) : (
                     /* Single Image View */
-                    <AnimatePresence mode="wait">
-                        <motion.div
+                    <>
+                        <div
                             key={processedImage || originalImage}
-                            initial={{ opacity: 0.8, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0.8, scale: 0.98 }}
-                            transition={{
-                                type: "spring",
-                                stiffness: 300,
-                                damping: 30,
-                            }}
                             className="w-full h-full"
                         >
                             <img
@@ -233,19 +164,14 @@ export default function CanvasEditor({
                                 className="w-full h-full object-contain"
                                 loading="eager"
                             />
-                        </motion.div>
-                    </AnimatePresence>
+                        </div>
+                    </>
                 )}
 
                 {/* Overlay Controls */}
-                <AnimatePresence>
+                <>
                     {processedImage && !isProcessing && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            className="absolute top-3 right-3"
-                        >
+                        <div className="absolute top-3 right-3">
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -271,48 +197,36 @@ export default function CanvasEditor({
                                     </>
                                 )}
                             </Button>
-                        </motion.div>
+                        </div>
                     )}
-                </AnimatePresence>
-            </motion.div>
+                </>
+            </div>
 
             {/* Status Strip */}
-            <motion.div layout className="text-center py-1">
-                <AnimatePresence mode="wait">
+            <div className="text-center py-1">
+                <>
                     {isProcessing ? (
-                        <motion.p
+                        <p
                             key="processing"
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
                             className="text-xs text-primary font-medium flex items-center justify-center gap-1.5"
                         >
-                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <BrandMark className="w-3 h-3 " />
                             Processing with AI...
-                        </motion.p>
+                        </p>
                     ) : processedImage ? (
-                        <motion.p
+                        <p
                             key="done"
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
                             className="text-xs text-primary font-medium"
                         >
                             ✨ Magic applied! Compare or export your result
-                        </motion.p>
+                        </p>
                     ) : (
-                        <motion.p
-                            key="idle"
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            className="text-xs text-muted-foreground"
-                        >
+                        <p key="idle" className="text-xs text-muted-foreground">
                             Select a tool below to start editing
-                        </motion.p>
+                        </p>
                     )}
-                </AnimatePresence>
-            </motion.div>
+                </>
+            </div>
         </div>
     );
 }
