@@ -1,0 +1,892 @@
+.hero {
+    position: relative;
+    overflow: clip;
+    padding: 120px 24px 64px;
+    background: var(--background);
+    isolation: isolate;
+}
+.hero::before {
+    content: "";
+    position: absolute;
+    inset: 50% 0 0;
+    z-index: -1;
+    background: linear-gradient(
+        180deg,
+        transparent,
+        color-mix(in oklab, var(--muted) 55%, transparent)
+    );
+}
+.heroInner {
+    max-width: 1152px;
+    margin-inline: auto;
+}
+.intro {
+    text-align: center;
+    max-width: 860px;
+    margin: 0 auto 40px;
+}
+.title {
+    font-size: clamp(48px, 4.5vw, 64px);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
+    text-wrap: balance;
+}
+.title span {
+    color: var(--muted-foreground);
+}
+.subtitle {
+    margin: 16px 0 0;
+    color: var(--foreground);
+    font-size: 22px;
+    line-height: 1.4;
+}
+.description {
+    max-width: 680px;
+    margin: 12px auto 0;
+    color: var(--muted-foreground);
+    font-size: 16px;
+    line-height: 1.6;
+    text-wrap: pretty;
+}
+.actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+.actions a {
+    display: inline-flex;
+    width: auto;
+}
+.actions :is(button, a) {
+    min-height: 44px;
+    border-radius: 8px;
+}
+.trialNote {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+}
+.trialNote span {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-inline: 3px;
+}
+.visual {
+    position: relative;
+}
+
+.workbench {
+    --wb-ground: #fafafa;
+    --wb-panel: #fff;
+    --wb-ink: #27292c;
+    --wb-muted: #666c73;
+    --wb-line: #e5e7e9;
+    --wb-soft: #f1f3f4;
+    --wb-accent: #407475;
+    position: relative;
+    max-width: 960px;
+    margin-inline: auto;
+    color: var(--wb-ink);
+    background: var(--wb-panel);
+    border-radius: 14px;
+    box-shadow:
+        0 16px 64px -18px rgb(0 0 0 / 22%),
+        0 3px 10px -4px rgb(0 0 0 / 12%);
+    overflow: hidden;
+    text-align: left;
+}
+:global(.dark) .workbench {
+    --wb-ground: #191b1d;
+    --wb-panel: #141618;
+    --wb-ink: #e8ebed;
+    --wb-muted: #a0a6ab;
+    --wb-line: #2c3033;
+    --wb-soft: #24282b;
+    --wb-accent: #95c4bf;
+    box-shadow: 0 18px 72px -16px rgb(0 0 0 / 60%);
+}
+.workbench button {
+    cursor: pointer;
+}
+.workbench button:disabled {
+    cursor: wait;
+    opacity: 0.5;
+}
+.workbench button:focus-visible {
+    outline: 2px solid var(--wb-accent);
+    outline-offset: 3px;
+}
+.workbench ::selection {
+    background: #bdd8d4;
+    color: #152c2b;
+}
+.workbenchHeader {
+    height: 46px;
+    padding-inline: 20px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--wb-line);
+}
+.documentTitle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12px;
+    font-weight: 500;
+}
+.workbenchMark {
+    width: 21px;
+    height: 21px;
+}
+.documentExtension {
+    color: var(--wb-muted);
+    margin-left: -6px;
+    font-weight: 400;
+}
+.previewLabel {
+    margin-left: auto;
+    color: var(--wb-muted);
+    font-size: 11px;
+}
+.iconButton {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 7px;
+    color: var(--wb-muted);
+}
+.workbenchBody {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+}
+.tools {
+    display: flex;
+    flex-direction: column;
+    padding: 23px 12px 18px;
+    border-right: 1px solid var(--wb-line);
+}
+.toolsHeading {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0 4px 20px;
+}
+.toolStack {
+    display: grid;
+    gap: 6px;
+}
+.toolRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 62px;
+    padding: 9px 8px;
+    border-radius: 7px;
+    background: var(--wb-soft);
+    text-align: left;
+}
+.toolIcon {
+    flex-shrink: 0;
+    color: var(--wb-muted);
+}
+.toolText {
+    font-size: 11px;
+    line-height: 1.5;
+    flex: 1;
+    white-space: nowrap;
+    font-weight: 500;
+}
+.toolDetail {
+    display: block;
+    color: var(--wb-muted);
+    font-size: 10px;
+    font-weight: 400;
+}
+.appliedCheck {
+    color: var(--wb-accent);
+    flex-shrink: 0;
+}
+.switch {
+    width: 24px;
+    height: 14px;
+    background: var(--wb-muted);
+    border-radius: 10px;
+    padding: 2px;
+    flex-shrink: 0;
+}
+.switch::before {
+    content: "";
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--wb-panel);
+}
+.switch[data-on="true"] {
+    background: var(--wb-accent);
+}
+.switch[data-on="true"]::before {
+    transform: translateX(10px);
+}
+.backgroundPicker {
+    margin: 27px 0 0;
+    padding: 0;
+    border: 0;
+}
+.backgroundPicker legend {
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+.swatches {
+    display: flex;
+    gap: 0;
+}
+.swatch {
+    height: 44px;
+    width: 44px;
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    border: 3px solid var(--wb-panel);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%);
+}
+.swatch[aria-pressed="true"] {
+    outline: 1px solid var(--wb-muted);
+    outline-offset: -1px;
+}
+.backgroundName {
+    display: block;
+    font-size: 10px;
+    color: var(--wb-muted);
+    margin-top: 7px;
+}
+.checkerboard {
+    background-color: #f2f4f5;
+    background-image: repeating-conic-gradient(
+        #e3e7e9 0% 25%,
+        transparent 0% 50%
+    );
+    background-size: 16px 16px;
+}
+.sourceFile {
+    margin: auto 4px 0;
+    padding-top: 23px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--wb-muted);
+    font-size: 10px;
+}
+.sourceFile > span {
+    flex: 1;
+    color: var(--wb-ink);
+    line-height: 1.6;
+}
+.sourceFile > span > span {
+    display: block;
+    color: var(--wb-muted);
+    font-variant-numeric: tabular-nums;
+}
+.canvasColumn {
+    min-width: 0;
+    padding: 0 16px;
+    background: var(--wb-ground);
+}
+.canvasToolbar {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--wb-muted);
+}
+.canvasToolbar > span,
+.canvasToolbar > label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.canvasFit {
+    font-variant-numeric: tabular-nums;
+}
+.comparison {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1200 / 674;
+    overflow: hidden;
+    border-radius: 3px;
+    cursor: ew-resize;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.comparisonImage {
+    object-fit: cover;
+    pointer-events: none;
+    user-select: none;
+}
+.originalImage {
+    position: absolute;
+    inset: 0;
+    background: var(--wb-line);
+}
+.imageLabels {
+    position: absolute;
+    inset: 14px 14px auto;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+}
+.imageLabels > span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #fff;
+    background: rgb(18 25 32 / 72%);
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    line-height: 1;
+}
+.divider {
+    position: absolute;
+    inset-block: 0;
+    width: 1px;
+    background: #fff;
+    pointer-events: none;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 10%);
+}
+.dividerHandle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    color: #25303a;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+.comparisonRange {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    margin: 0;
+}
+.comparison:has(.comparisonRange:focus-visible) {
+    outline: 2px solid #ffffff;
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 4px #365f64;
+}
+.comparison:has(.comparisonRange:focus-visible) .dividerHandle {
+    outline: 3px solid #365f64;
+    outline-offset: 3px;
+}
+.canvasFooter {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--wb-muted);
+    font-size: 10px;
+}
+.canvasFooter > span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.workbenchFooter {
+    min-height: 44px;
+    padding: 6px 14px 6px 20px;
+    border-top: 1px solid var(--wb-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.editStatus {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--wb-muted);
+}
+.editStatus svg {
+    color: var(--wb-accent);
+}
+.canvasError {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: var(--wb-ground);
+    color: var(--wb-ink);
+    font-size: 13px;
+    cursor: default;
+}
+.canvasError button {
+    min-height: 44px;
+    padding: 0 15px;
+    background: var(--wb-soft);
+    border-radius: 6px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .iconButton:hover,
+    button.toolRow:hover {
+        background: var(--wb-line);
+    }
+    .swatch:hover {
+        outline: 1px solid var(--wb-muted);
+        outline-offset: -1px;
+    }
+}
+@media (max-width: 1023px) {
+    .hero {
+        padding-top: 112px;
+        padding-bottom: 56px;
+    }
+    .heroInner {
+        width: 100%;
+    }
+    .workbenchBody {
+        grid-template-columns: 204px minmax(0, 1fr);
+    }
+    .tools {
+        padding-inline: 12px;
+    }
+    .toolRow {
+        gap: 6px;
+        padding-inline: 6px;
+    }
+    .toolText {
+        font-size: 10px;
+    }
+    .toolDetail {
+        font-size: 10px;
+    }
+    .swatch {
+        width: 44px;
+    }
+    .comparison {
+        aspect-ratio: 1200 / 674;
+    }
+    .canvasColumn {
+        padding-inline: 12px;
+    }
+    .backgroundPicker {
+        margin-top: 24px;
+    }
+}
+@media (max-width: 639px) {
+    .hero {
+        padding: 96px 24px 40px;
+        display: block;
+    }
+    .intro {
+        margin-bottom: 32px;
+    }
+    .title {
+        font-size: clamp(36px, 9.7vw, 44px);
+        letter-spacing: -0.03em;
+    }
+    .subtitle {
+        font-size: 18px;
+        margin-top: 14px;
+    }
+    .description {
+        font-size: 14px;
+        margin-top: 10px;
+        line-height: 1.6;
+    }
+    .actions {
+        gap: 8px;
+    }
+    .actions > * {
+        flex: 1;
+    }
+    .actions :is(button, a) {
+        width: 100%;
+        font-size: 12px;
+        padding-inline: 12px;
+    }
+    .trialNote {
+        font-size: 10px;
+        margin-top: 12px;
+    }
+    .workbench {
+        border-radius: 12px;
+    }
+    .workbenchHeader {
+        height: 46px;
+        padding-inline: 13px 6px;
+        gap: 4px;
+    }
+    .documentTitle {
+        font-size: 11px;
+        gap: 7px;
+    }
+    .previewLabel {
+        font-size: 10px;
+    }
+    .workbenchBody {
+        display: flex;
+        flex-direction: column;
+    }
+    .tools {
+        order: 1;
+        border-right: 0;
+        border-top: 1px solid var(--wb-line);
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .toolsHeading,
+    .sourceFile,
+    .toolDetail,
+    .backgroundName {
+        display: none;
+    }
+    .toolStack {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .toolRow {
+        min-height: 44px;
+        padding: 8px;
+        gap: 7px;
+    }
+    .toolText {
+        font-size: 10px;
+    }
+    .toolIcon svg {
+        width: 14px;
+        height: 14px;
+    }
+    .backgroundPicker {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 0;
+    }
+    .backgroundPicker legend {
+        float: left;
+        font-size: 10px;
+        margin: 0;
+        line-height: 44px;
+    }
+    .swatches {
+        gap: 3px;
+    }
+    .swatch {
+        width: 44px;
+        height: 44px;
+    }
+    .canvasColumn {
+        padding-inline: 10px;
+    }
+    .canvasToolbar {
+        height: 34px;
+        font-size: 10px;
+    }
+    .comparison {
+        aspect-ratio: 1200 / 674;
+    }
+    .imageLabels {
+        inset: 10px 10px auto;
+    }
+    .imageLabels > span {
+        font-size: 10px;
+        padding: 5px 6px;
+    }
+    .dividerHandle {
+        width: 32px;
+        height: 32px;
+    }
+    .canvasFooter {
+        font-size: 10px;
+        height: 28px;
+    }
+    .workbenchFooter {
+        min-height: 44px;
+        padding-inline: 12px;
+    }
+    .editStatus {
+        font-size: 10px;
+    }
+}
+
+.shortToolLabel {
+    display: none;
+}
+@media (max-width: 369px) {
+    .longToolLabel {
+        display: none;
+    }
+    .shortToolLabel {
+        display: inline;
+    }
+    .toolRow {
+        gap: 5px;
+        padding: 6px;
+    }
+    .toolIcon svg {
+        width: 12px;
+        height: 12px;
+    }
+    .backgroundPicker {
+        display: block;
+    }
+    .backgroundPicker legend {
+        float: none;
+        line-height: 18px;
+        margin-bottom: 6px;
+    }
+}
+
+.originalStatus {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--wb-muted);
+    font-size: 11px;
+}
+.backdrop {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+.workbench {
+    z-index: 1;
+}
+.floatingShape {
+    position: absolute;
+    opacity: 0.52;
+    pointer-events: none;
+}
+.toolShape {
+    width: 200px;
+    height: 190px;
+    left: -52px;
+    top: 52px;
+}
+.toolObject {
+    position: relative;
+    width: 190px;
+    height: 180px;
+    transform: rotate(-10deg) skewY(6deg);
+}
+.toolPlate,
+.toolFace {
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+}
+.toolPlate:first-child {
+    transform: translate(-16px, 18px);
+    background: linear-gradient(145deg, #c9e9eb, #5aa3a7 70%, #35666f);
+    box-shadow: 3px 9px 16px rgb(45 85 99 / 12%);
+}
+.toolPlate:nth-child(2) {
+    transform: translate(-8px, 9px);
+    background: linear-gradient(145deg, #e0f4f2, #88c7cb 75%, #5f929a);
+    box-shadow: inset 1px 1px 1px #fff;
+}
+.toolFace {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 12px;
+    color: #315c65;
+    background: linear-gradient(150deg, #fff 5%, #eaf5f4 70%, #adced3);
+    box-shadow:
+        inset 1px 1px 1px #fff,
+        3px 7px 12px rgb(30 74 86 / 14%);
+}
+.toolObjectRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    font-size: 10px;
+    font-weight: 500;
+}
+.toolObjectRow > svg:first-child {
+    flex-shrink: 0;
+}
+.toolObjectRow > span {
+    flex: 1;
+}
+.toolObjectRow > svg:last-child {
+    color: #538f8d;
+}
+.cubeShape {
+    right: -58px;
+    top: 166px;
+    width: 176px;
+    height: 180px;
+}
+.editCube {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    transform: rotate(12deg);
+}
+.cubeFace,
+.cubeTop,
+.cubeSide {
+    position: absolute;
+    border-radius: 16px;
+}
+.cubeFace {
+    inset: 20px 0 -20px;
+    display: grid;
+    place-items: center;
+    color: #bd742d;
+    background: linear-gradient(135deg, #fff0ce, #efc079 58%, #dd9d50);
+    box-shadow:
+        inset 2px 2px 2px rgb(255 255 255 / 85%),
+        inset -3px -3px 4px rgb(169 99 27 / 18%),
+        8px 18px 28px rgb(153 106 48 / 13%);
+}
+.cubeFace svg {
+    width: 60px;
+    height: 60px;
+    filter: drop-shadow(1px 2px 1px rgb(255 244 219 / 75%));
+}
+.cubeTop {
+    top: 0;
+    left: 11px;
+    width: 132px;
+    height: 42px;
+    transform: skewX(-28deg);
+    background: linear-gradient(160deg, #fff7e4, #e9bd75);
+}
+.cubeSide {
+    top: 16px;
+    right: -22px;
+    width: 38px;
+    height: 131px;
+    transform: skewY(-42deg);
+    background: linear-gradient(90deg, #d8a254, #bd843a);
+}
+.ringShape {
+    left: 18px;
+    bottom: 24px;
+    width: 132px;
+    height: 144px;
+}
+.colorRing {
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
+    transform: rotate(-25deg) scaleX(0.8);
+    background: conic-gradient(
+        from 35deg,
+        #9cdfe2,
+        #3798a5 22%,
+        #276675 45%,
+        #83cfd1 72%,
+        #ddf9f2 90%,
+        #9cdfe2
+    );
+    box-shadow:
+        inset -5px -8px 9px rgb(11 82 99 / 25%),
+        inset 5px 6px 8px rgb(241 255 251 / 85%),
+        10px 14px 20px rgb(29 96 105 / 14%);
+    position: relative;
+}
+.colorRing::before {
+    content: "";
+    position: absolute;
+    inset: 29px;
+    border-radius: 50%;
+    background: var(--background);
+    box-shadow:
+        -3px -5px 6px rgb(19 97 110 / 36%),
+        3px 5px 5px rgb(221 255 248 / 90%);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .floatingShape[data-hero-drift] {
+        animation: hero-shape-float 8s ease-in-out infinite alternate;
+    }
+    .cubeShape[data-hero-drift] {
+        animation-duration: 10s;
+        animation-delay: -4s;
+        animation-direction: alternate-reverse;
+    }
+    .ringShape[data-hero-drift] {
+        animation-duration: 9s;
+        animation-delay: -3s;
+    }
+}
+@keyframes hero-shape-float {
+    from {
+        transform: translateY(-18px) rotate(-4deg);
+    }
+    to {
+        transform: translateY(18px) rotate(5deg);
+    }
+}
+@media (max-width: 1023px) {
+    .toolShape {
+        left: -74px;
+    }
+    .cubeShape {
+        right: -76px;
+    }
+    .ringShape {
+        left: -36px;
+    }
+    .floatingShape {
+        opacity: 0.4;
+    }
+}
+@media (max-width: 639px) {
+    .toolShape {
+        left: -90px;
+        top: 56px;
+    }
+    .cubeShape {
+        right: -100px;
+        top: 226px;
+    }
+    .ringShape {
+        left: -52px;
+        bottom: 18px;
+    }
+    .floatingShape {
+        opacity: 0.32;
+    }
+    .originalStatus {
+        font-size: 10px;
+    }
+}
