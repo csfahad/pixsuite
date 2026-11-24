@@ -1,4 +1,5 @@
 "use client";
+import { BrandMark } from "@/components/brand/logo";
 
 import {
     CheckCircle,
@@ -8,7 +9,6 @@ import {
     Download,
     Expand,
     Layers,
-    Loader2,
     Lock,
     Scissors,
     Sparkles,
@@ -17,12 +17,12 @@ import {
     X,
     Zap,
 } from "lucide-react";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { AnimatePresence, motion } from "motion/react";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/loading-state";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -177,6 +177,10 @@ export default function Editor() {
     const [processedImageHQ, setProcessedImageHQ] = useState<string | null>(
         null,
     );
+    const [isApplying, setIsApplying] = useState(false);
+    const operationInFlight = useRef(false);
+    const exportInFlight = useRef(false);
+    const [exportingFormat, setExportingFormat] = useState<string | null>(null);
     const [currentJob, setCurrentJob] = useState<ProcessingJob | null>(null);
     const [editHistory, setEditHistory] = useState<ProcessingJob[]>([]);
     const [activeEffects, setActiveEffects] = useState<Set<string>>(new Set());
@@ -361,7 +365,12 @@ export default function Editor() {
     };
 
     const handleToolClick = async (toolId: string) => {
-        if (!uploadedImage) return;
+        if (
+            !uploadedImage ||
+            operationInFlight.current ||
+            exportInFlight.current
+        )
+            return;
 
         const tool = allTools.find((t) => t.id === toolId);
         if (!tool) return;
@@ -436,189 +445,218 @@ export default function Editor() {
     };
 
     const applyEffect = async (toolId: string, prompt?: string) => {
-        if (!uploadedImage) return;
-
-        // deduct credits before applying
-        const allowed = await deductCredits(toolId);
-        if (!allowed) return;
-        const startedAt = performance.now();
-
-        const newJob: ProcessingJob = {
-            id: Date.now().toString(),
-            type: toolId,
-            status: "queued",
-            progress: 0,
-        };
-
-        setCurrentJob(newJob);
-
-        const newActiveEffects = new Set(activeEffects);
-        newActiveEffects.add(toolId);
-        setActiveEffects(newActiveEffects);
-
-        // store the prompt for this effect so it's preserved when chaining
-        const newPrompts = { ...effectPrompts };
-        if (prompt) {
-            newPrompts[toolId] = prompt;
-        }
-        setEffectPrompts(newPrompts);
-
-        // build transforms using stored prompts for ALL effects
-        const allEffects = Array.from(newActiveEffects);
-        const transforms = allEffects.map((effect) =>
-            getImageKitTransform(
-                effect,
-                effect === toolId ? prompt : newPrompts[effect],
-            ),
-        );
-        const newImageUrl = `${uploadedImage}?tr=${transforms.join(":")}`;
-
-        // low-quality preview URL for instant display
-        const previewUrl = `${uploadedImage}?tr=${transforms.join(":")},q-40`;
-        const processingProperties = {
-            job_id: newJob.id,
-            tool_id: toolId,
-            prompt,
-            has_prompt: Boolean(prompt),
-            prompts: newPrompts,
-            credits_spent: CREDIT_COSTS[toolId],
-            plan: userPlan,
-            original_image_url: uploadedImage,
-            image_url: newImageUrl,
-            active_effects: allEffects,
-        };
-        trackEvent("editor_processing_started", processingProperties);
-
+        if (
+            !uploadedImage ||
+            operationInFlight.current ||
+            exportInFlight.current
+        )
+            return;
+        operationInFlight.current = true;
+        setIsApplying(true);
+        setCurrentJob(null);
         try {
-            setCurrentJob((prev) =>
-                prev ? { ...prev, status: "processing", progress: 10 } : null,
-            );
+            // deduct credits before applying
+            const allowed = await deductCredits(toolId);
+            if (!allowed) return;
+            const startedAt = performance.now();
 
-            let attempts = 0;
-            const maxAttempts = 30;
-            const pollInterval = 2000;
-
-            // use Image() for preloading — avoids CORS issues with HEAD fetch
-            // and pre-caches the image for instant display
-            const preloadImage = (url: string): Promise<boolean> => {
-                return new Promise((resolve) => {
-                    const img = new window.Image();
-                    img.onload = () => resolve(true);
-                    img.onerror = () => resolve(false);
-                    img.src =
-                        url +
-                        (url.includes("?") ? "&" : "?") +
-                        `_t=${Date.now()}`;
-                });
+            const newJob: ProcessingJob = {
+                id: Date.now().toString(),
+                type: toolId,
+                status: "queued",
+                progress: 0,
             };
 
-            const pollImageKit = async (): Promise<boolean> => {
-                attempts++;
+            setCurrentJob(newJob);
 
-                // first try low-quality preview for fast display
-                if (attempts === 1) {
-                    const previewLoaded = await preloadImage(previewUrl);
-                    if (previewLoaded) {
-                        trackEvent("editor_preview_loaded", {
-                            ...processingProperties,
-                            preview_url: previewUrl,
-                        });
-                        setProcessedImage(previewUrl);
-                    }
-                }
+            const newActiveEffects = new Set(activeEffects);
+            newActiveEffects.add(toolId);
+            setActiveEffects(newActiveEffects);
 
-                const loaded = await preloadImage(newImageUrl);
+            // store the prompt for this effect so it's preserved when chaining
+            const newPrompts = { ...effectPrompts };
+            if (prompt) {
+                newPrompts[toolId] = prompt;
+            }
+            setEffectPrompts(newPrompts);
 
-                if (loaded) {
-                    trackEvent("editor_processing_completed", {
-                        ...processingProperties,
-                        duration_ms: Math.round(performance.now() - startedAt),
-                        attempts,
-                    });
-                    // swap to full quality
-                    setProcessedImage(newImageUrl);
-                    setProcessedImageHQ(newImageUrl);
-                    setCurrentJob((prev) =>
-                        prev
-                            ? {
-                                  ...prev,
-                                  progress: 100,
-                                  status: "completed",
-                              }
-                            : null,
-                    );
+            // build transforms using stored prompts for ALL effects
+            const allEffects = Array.from(newActiveEffects);
+            const transforms = allEffects.map((effect) =>
+                getImageKitTransform(
+                    effect,
+                    effect === toolId ? prompt : newPrompts[effect],
+                ),
+            );
+            const newImageUrl = `${uploadedImage}?tr=${transforms.join(":")}`;
 
-                    const completedJob = {
-                        ...newJob,
-                        status: "completed" as JobStatus,
-                        progress: 100,
-                        result: newImageUrl,
-                    };
-                    setEditHistory((prev) => [
-                        completedJob,
-                        ...prev.slice(0, 4),
-                    ]);
+            // low-quality preview URL for instant display
+            const previewUrl = `${uploadedImage}?tr=${transforms.join(":")},q-40`;
+            const processingProperties = {
+                job_id: newJob.id,
+                tool_id: toolId,
+                prompt,
+                has_prompt: Boolean(prompt),
+                prompts: newPrompts,
+                credits_spent: CREDIT_COSTS[toolId],
+                plan: userPlan,
+                original_image_url: uploadedImage,
+                image_url: newImageUrl,
+                active_effects: allEffects,
+            };
+            trackEvent("editor_processing_started", processingProperties);
 
-                    await refreshCredits();
-                    return true;
-                }
-
-                const progress = Math.min(10 + attempts * 3, 90);
-                setCurrentJob((prev) => (prev ? { ...prev, progress } : null));
-
-                if (attempts >= maxAttempts) {
-                    trackEvent("editor_processing_unconfirmed", {
-                        ...processingProperties,
-                        reason: "poll_timeout",
-                        duration_ms: Math.round(performance.now() - startedAt),
-                        attempts,
-                    });
-                    setProcessedImage(newImageUrl);
-                    setProcessedImageHQ(newImageUrl);
-                    setCurrentJob((prev) =>
-                        prev
-                            ? { ...prev, progress: 100, status: "completed" }
-                            : null,
-                    );
-
-                    const completedJob = {
-                        ...newJob,
-                        status: "completed" as JobStatus,
-                        progress: 100,
-                        result: newImageUrl,
-                    };
-                    setEditHistory((prev) => [
-                        completedJob,
-                        ...prev.slice(0, 4),
-                    ]);
-                    return true;
-                }
-
-                await new Promise((resolve) =>
-                    setTimeout(resolve, pollInterval),
+            try {
+                setCurrentJob((prev) =>
+                    prev
+                        ? { ...prev, status: "processing", progress: 10 }
+                        : null,
                 );
-                return pollImageKit();
-            };
 
-            await pollImageKit();
-        } catch (err) {
-            trackEvent("editor_processing_failed", {
-                ...processingProperties,
-                error: err instanceof Error ? err.message : String(err),
-                duration_ms: Math.round(performance.now() - startedAt),
-            });
-            console.error("Error applying effect:", err);
-            toast.error("Failed to apply transformation. Please try again.");
-            setCurrentJob((prev) =>
-                prev ? { ...prev, status: "error" } : null,
-            );
+                let attempts = 0;
+                const maxAttempts = 30;
+                const pollInterval = 2000;
+
+                // use Image() for preloading — avoids CORS issues with HEAD fetch
+                // and pre-caches the image for instant display
+                const preloadImage = (url: string): Promise<boolean> => {
+                    return new Promise((resolve) => {
+                        const img = new window.Image();
+                        img.onload = () => resolve(true);
+                        img.onerror = () => resolve(false);
+                        img.src =
+                            url +
+                            (url.includes("?") ? "&" : "?") +
+                            `_t=${Date.now()}`;
+                    });
+                };
+
+                const pollImageKit = async (): Promise<boolean> => {
+                    attempts++;
+
+                    // first try low-quality preview for fast display
+                    if (attempts === 1) {
+                        const previewLoaded = await preloadImage(previewUrl);
+                        if (previewLoaded) {
+                            trackEvent("editor_preview_loaded", {
+                                ...processingProperties,
+                                preview_url: previewUrl,
+                            });
+                            setProcessedImage(previewUrl);
+                        }
+                    }
+
+                    const loaded = await preloadImage(newImageUrl);
+
+                    if (loaded) {
+                        trackEvent("editor_processing_completed", {
+                            ...processingProperties,
+                            duration_ms: Math.round(
+                                performance.now() - startedAt,
+                            ),
+                            attempts,
+                        });
+                        // swap to full quality
+                        setProcessedImage(newImageUrl);
+                        setProcessedImageHQ(newImageUrl);
+                        setCurrentJob((prev) =>
+                            prev
+                                ? {
+                                      ...prev,
+                                      progress: 100,
+                                      status: "completed",
+                                  }
+                                : null,
+                        );
+
+                        const completedJob = {
+                            ...newJob,
+                            status: "completed" as JobStatus,
+                            progress: 100,
+                            result: newImageUrl,
+                        };
+                        setEditHistory((prev) => [
+                            completedJob,
+                            ...prev.slice(0, 4),
+                        ]);
+
+                        await refreshCredits();
+                        return true;
+                    }
+
+                    const progress = Math.min(10 + attempts * 3, 90);
+                    setCurrentJob((prev) =>
+                        prev ? { ...prev, progress } : null,
+                    );
+
+                    if (attempts >= maxAttempts) {
+                        trackEvent("editor_processing_unconfirmed", {
+                            ...processingProperties,
+                            reason: "poll_timeout",
+                            duration_ms: Math.round(
+                                performance.now() - startedAt,
+                            ),
+                            attempts,
+                        });
+                        setProcessedImage(newImageUrl);
+                        setProcessedImageHQ(newImageUrl);
+                        setCurrentJob((prev) =>
+                            prev
+                                ? {
+                                      ...prev,
+                                      progress: 100,
+                                      status: "completed",
+                                  }
+                                : null,
+                        );
+
+                        const completedJob = {
+                            ...newJob,
+                            status: "completed" as JobStatus,
+                            progress: 100,
+                            result: newImageUrl,
+                        };
+                        setEditHistory((prev) => [
+                            completedJob,
+                            ...prev.slice(0, 4),
+                        ]);
+                        return true;
+                    }
+
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, pollInterval),
+                    );
+                    return pollImageKit();
+                };
+
+                await pollImageKit();
+            } catch (err) {
+                trackEvent("editor_processing_failed", {
+                    ...processingProperties,
+                    error: err instanceof Error ? err.message : String(err),
+                    duration_ms: Math.round(performance.now() - startedAt),
+                });
+                console.error("Error applying effect:", err);
+                toast.error(
+                    "Failed to apply transformation. Please try again.",
+                );
+                setCurrentJob((prev) =>
+                    prev ? { ...prev, status: "error" } : null,
+                );
+            }
+        } finally {
+            operationInFlight.current = false;
+            setIsApplying(false);
         }
     };
 
     const handleExport = async (format: string) => {
         // always download full quality image
         const downloadUrl = processedImageHQ || processedImage;
-        if (!downloadUrl) return;
+        if (!downloadUrl || exportInFlight.current || operationInFlight.current)
+            return;
+        exportInFlight.current = true;
+        setExportingFormat(format);
         const startedAt = performance.now();
         const exportProperties = {
             format,
@@ -685,6 +723,9 @@ export default function Editor() {
             toast.error(
                 "Failed to download. Please check your connection and try again.",
             );
+        } finally {
+            exportInFlight.current = false;
+            setExportingFormat(null);
         }
     };
 
@@ -702,7 +743,10 @@ export default function Editor() {
         });
     };
 
-    const isProcessing = currentJob?.status === "processing";
+    const isProcessing =
+        isApplying ||
+        currentJob?.status === "processing" ||
+        currentJob?.status === "queued";
 
     const getStatusSteps = () => {
         if (!currentJob) return [];
@@ -725,6 +769,11 @@ export default function Editor() {
 
     return (
         <>
+            {exportingFormat && (
+                <LoadingState
+                    label={`Preparing ${exportingFormat.toUpperCase()}…`}
+                />
+            )}
             <section
                 id="editor"
                 className="pt-24 pb-18 relative overflow-hidden"
@@ -737,24 +786,14 @@ export default function Editor() {
 
                 {/* Credit error toast */}
                 {creditError && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground px-6 py-3 rounded-lg shadow-lg text-sm font-medium"
-                    >
+                    <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground px-6 py-3 rounded-lg shadow-lg text-sm font-medium">
                         {creditError}
-                    </motion.div>
+                    </div>
                 )}
 
                 <div className="w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 relative z-10">
                     {/* Active Effects & Export Bar */}
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4 }}
-                        className="flex items-center justify-between mb-6"
-                    >
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3 flex-wrap">
                             {/* Credit balance indicator */}
                             {isAuthenticated && (
@@ -768,69 +807,53 @@ export default function Editor() {
                             )}
 
                             {/* Active effects badges */}
-                            <AnimatePresence mode="popLayout">
+                            <>
                                 {Array.from(activeEffects).map((effectId) => {
                                     const tool = allTools.find(
                                         (t) => t.id === effectId,
                                     );
                                     return (
-                                        <motion.div
-                                            key={effectId}
-                                            initial={{
-                                                opacity: 0,
-                                                scale: 0.8,
-                                                x: -10,
-                                            }}
-                                            animate={{
-                                                opacity: 1,
-                                                scale: 1,
-                                                x: 0,
-                                            }}
-                                            exit={{
-                                                opacity: 0,
-                                                scale: 0.8,
-                                                x: -10,
-                                            }}
-                                            transition={{
-                                                type: "spring",
-                                                stiffness: 400,
-                                                damping: 25,
-                                            }}
-                                        >
+                                        <div key={effectId}>
                                             <Badge
                                                 variant="secondary"
-                                                className="gap-1.5 py-1 px-2.5 cursor-pointer hover:bg-destructive/20 transition-colors"
+                                                className="gap-1.5 py-1 px-2.5 cursor-pointer hover:bg-destructive/20 "
                                                 onClick={() =>
                                                     handleToolClick(effectId)
                                                 }
                                             >
-                                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-primary " />
                                                 {tool?.name}
                                                 <span className="text-[9px] opacity-70">
                                                     -{tool?.credits || 0}cr
                                                 </span>
                                                 <X className="w-3 h-3 opacity-60" />
                                             </Badge>
-                                        </motion.div>
+                                        </div>
                                     );
                                 })}
-                            </AnimatePresence>
+                            </>
                         </div>
-                    </motion.div>
+                    </div>
 
                     {/* Main 3-Panel Layout */}
                     <div className="grid lg:grid-cols-4 gap-8">
                         {/* ======= LEFT PANEL — Upload ======= */}
-                        <motion.aside
-                            initial={{ opacity: 0, x: -50 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            className="lg:col-span-1"
-                        >
+                        <aside className="lg:col-span-1">
                             {/* Upload Zone */}
                             <div className="mb-4">
-                                <Suspense fallback={null}>
+                                <Suspense
+                                    fallback={
+                                        <LoadingState
+                                            label="Loading uploader…"
+                                            className="min-h-40"
+                                        />
+                                    }
+                                >
                                     <UploadZone
+                                        busy={
+                                            isProcessing ||
+                                            exportingFormat !== null
+                                        }
                                         onImageUpload={handleImageUpload}
                                         updatedCreditsRemaining={
                                             creditsRemaining
@@ -838,35 +861,25 @@ export default function Editor() {
                                     />
                                 </Suspense>
                             </div>
-                        </motion.aside>
+                        </aside>
 
                         {/* ======= CENTER — Canvas + Tools ======= */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 50 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            className="lg:col-span-2"
-                        >
+                        <div className="lg:col-span-2">
                             <CanvasEditor
                                 originalImage={uploadedImage}
                                 processedImage={processedImage}
-                                isProcessing={isProcessing ?? false}
+                                isProcessing={isProcessing}
+                                processingLabel={
+                                    isApplying && !currentJob
+                                        ? "Checking credits…"
+                                        : "Applying edit…"
+                                }
                             />
 
                             {/* Prompt Input */}
-                            <AnimatePresence>
+                            <>
                                 {showPromptInput && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: "auto" }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        transition={{
-                                            type: "spring",
-                                            stiffness: 300,
-                                            damping: 30,
-                                        }}
-                                        className="overflow-hidden mt-4"
-                                    >
+                                    <div className="overflow-hidden mt-4">
                                         <div className="p-4 rounded-xl bg-muted/50 border border-border space-y-3">
                                             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                                                 <Sparkles className="w-3.5 h-3.5" />
@@ -889,7 +902,7 @@ export default function Editor() {
                                                     );
                                                 }}
                                                 placeholder="e.g., Replace background with a sunset beach..."
-                                                className="w-full p-3 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+                                                className="w-full p-3 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 "
                                                 rows={3}
                                                 autoFocus
                                             />
@@ -926,28 +939,20 @@ export default function Editor() {
                                                 </Button>
                                             </div>
                                         </div>
-                                    </motion.div>
+                                    </div>
                                 )}
-                            </AnimatePresence>
+                            </>
 
                             {/* AI Tools — Categorized Grid Below Canvas */}
                             <div className="mt-6 space-y-5">
                                 <TooltipProvider delayDuration={300}>
-                                    {toolCategories.map((category, catIdx) => {
+                                    {toolCategories.map((category) => {
                                         const isCollapsed =
                                             collapsedCategories.has(
                                                 category.label,
                                             );
                                         return (
-                                            <motion.div
-                                                key={category.label}
-                                                initial={{ opacity: 0, y: 20 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{
-                                                    duration: 0.3,
-                                                    delay: catIdx * 0.08,
-                                                }}
-                                            >
+                                            <div key={category.label}>
                                                 {/* Category Header */}
                                                 <button
                                                     onClick={() =>
@@ -955,46 +960,24 @@ export default function Editor() {
                                                             category.label,
                                                         )
                                                     }
-                                                    className="flex items-center gap-2 w-full mb-3 text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                                                    className="flex items-center gap-2 w-full mb-3 text-sm font-semibold text-foreground hover:text-primary  cursor-pointer"
                                                 >
                                                     <category.icon className="w-4 h-4" />
                                                     <span className="flex-1 text-left">
                                                         {category.label}
                                                     </span>
                                                     <ChevronDown
-                                                        className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`}
+                                                        className={`w-3.5 h-3.5 text-muted-foreground   ${isCollapsed ? "-rotate-90" : ""}`}
                                                     />
                                                 </button>
 
                                                 {/* Tools Grid */}
-                                                <AnimatePresence
-                                                    initial={false}
-                                                >
+                                                <>
                                                     {!isCollapsed && (
-                                                        <motion.div
-                                                            initial={{
-                                                                height: 0,
-                                                                opacity: 0,
-                                                            }}
-                                                            animate={{
-                                                                height: "auto",
-                                                                opacity: 1,
-                                                            }}
-                                                            exit={{
-                                                                height: 0,
-                                                                opacity: 0,
-                                                            }}
-                                                            transition={{
-                                                                duration: 0.2,
-                                                            }}
-                                                            className="overflow-hidden"
-                                                        >
+                                                        <div className="overflow-hidden">
                                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                                                 {category.tools.map(
-                                                                    (
-                                                                        tool,
-                                                                        toolIdx,
-                                                                    ) => {
+                                                                    (tool) => {
                                                                         const isActive =
                                                                             activeEffects.has(
                                                                                 tool.id,
@@ -1006,7 +989,9 @@ export default function Editor() {
                                                                                 "processing";
                                                                         const isDisabled =
                                                                             !uploadedImage ||
-                                                                            isProcessing;
+                                                                            isProcessing ||
+                                                                            exportingFormat !==
+                                                                                null;
                                                                         const locked =
                                                                             isToolLocked(
                                                                                 tool,
@@ -1021,21 +1006,7 @@ export default function Editor() {
                                                                                 <TooltipTrigger
                                                                                     asChild
                                                                                 >
-                                                                                    <motion.button
-                                                                                        initial={{
-                                                                                            opacity: 0,
-                                                                                            y: 8,
-                                                                                        }}
-                                                                                        animate={{
-                                                                                            opacity: 1,
-                                                                                            y: 0,
-                                                                                        }}
-                                                                                        transition={{
-                                                                                            duration: 0.2,
-                                                                                            delay:
-                                                                                                toolIdx *
-                                                                                                0.04,
-                                                                                        }}
+                                                                                    <button
                                                                                         onClick={() =>
                                                                                             handleToolClick(
                                                                                                 tool.id,
@@ -1045,7 +1016,7 @@ export default function Editor() {
                                                                                             isDisabled ||
                                                                                             locked
                                                                                         }
-                                                                                        className={`tool-card flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border transition-all group ${
+                                                                                        className={`tool-card flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border  group ${
                                                                                             isActive
                                                                                                 ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
                                                                                                 : locked
@@ -1055,7 +1026,7 @@ export default function Editor() {
                                                                                     >
                                                                                         {/* Icon */}
                                                                                         <div
-                                                                                            className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                                                                                            className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center  ${
                                                                                                 isActive
                                                                                                     ? "bg-primary-foreground/20"
                                                                                                     : locked
@@ -1064,7 +1035,7 @@ export default function Editor() {
                                                                                             }`}
                                                                                         >
                                                                                             {isToolProcessing ? (
-                                                                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                                                <BrandMark className="w-3.5 h-3.5 " />
                                                                                             ) : locked ? (
                                                                                                 <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                                                                                             ) : (
@@ -1105,7 +1076,7 @@ export default function Editor() {
                                                                                                 +
                                                                                             </span>
                                                                                         )}
-                                                                                    </motion.button>
+                                                                                    </button>
                                                                                 </TooltipTrigger>
                                                                                 <TooltipContent
                                                                                     side="bottom"
@@ -1127,23 +1098,18 @@ export default function Editor() {
                                                                     },
                                                                 )}
                                                             </div>
-                                                        </motion.div>
+                                                        </div>
                                                     )}
-                                                </AnimatePresence>
-                                            </motion.div>
+                                                </>
+                                            </div>
                                         );
                                     })}
                                 </TooltipProvider>
                             </div>
-                        </motion.div>
+                        </div>
 
                         {/* ======= RIGHT PANEL — Status & History ======= */}
-                        <motion.aside
-                            initial={{ opacity: 0, x: 30 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.5, delay: 0.3 }}
-                            className="editor-panel p-5 lg:sticky lg:top-20 space-y-6"
-                        >
+                        <aside className="editor-panel p-5 lg:sticky lg:top-20 space-y-6">
                             {/* Processing Status */}
                             <div>
                                 <div className="flex items-center gap-2 mb-4">
@@ -1153,12 +1119,13 @@ export default function Editor() {
                                     </h3>
                                 </div>
 
-                                {currentJob ? (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 5 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="space-y-4"
-                                    >
+                                {isApplying && !currentJob ? (
+                                    <LoadingState
+                                        label="Checking credits…"
+                                        className="justify-start py-3"
+                                    />
+                                ) : currentJob ? (
+                                    <div className="space-y-4">
                                         {/* Job Info */}
                                         <div className="flex items-center gap-3">
                                             <div
@@ -1179,11 +1146,11 @@ export default function Editor() {
                                                   "error" ? (
                                                     <X className="w-5 h-5 text-destructive" />
                                                 ) : (
-                                                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                                    <BrandMark className="w-5 h-5 text-primary " />
                                                 )}
                                                 {currentJob.status ===
                                                     "processing" && (
-                                                    <div className="absolute inset-0 rounded-xl border-2 border-primary/30 animate-ping" />
+                                                    <div className="absolute inset-0 rounded-xl border-2 border-primary/30 " />
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -1259,7 +1226,7 @@ export default function Editor() {
                                                         !step.active ? (
                                                             <CheckCircle className="w-2.5 h-2.5" />
                                                         ) : step.active ? (
-                                                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                                            <BrandMark className="w-2.5 h-2.5 " />
                                                         ) : (
                                                             <Clock className="w-2.5 h-2.5" />
                                                         )}
@@ -1271,7 +1238,7 @@ export default function Editor() {
                                                 </div>
                                             ))}
                                         </div>
-                                    </motion.div>
+                                    </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-6 text-center">
                                         <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mb-3">
@@ -1308,30 +1275,11 @@ export default function Editor() {
 
                                 {editHistory.length > 0 ? (
                                     <div className="space-y-2">
-                                        <AnimatePresence mode="popLayout">
-                                            {editHistory.map((job, idx) => (
-                                                <motion.div
+                                        <>
+                                            {editHistory.map((job) => (
+                                                <div
                                                     key={job.id}
-                                                    initial={{
-                                                        opacity: 0,
-                                                        y: -8,
-                                                        scale: 0.95,
-                                                    }}
-                                                    animate={{
-                                                        opacity: 1,
-                                                        y: 0,
-                                                        scale: 1,
-                                                    }}
-                                                    exit={{
-                                                        opacity: 0,
-                                                        scale: 0.95,
-                                                    }}
-                                                    transition={{
-                                                        type: "spring",
-                                                        stiffness: 400,
-                                                        damping: 25,
-                                                    }}
-                                                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors cursor-default"
+                                                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 hover:bg-muted/60  cursor-default"
                                                 >
                                                     <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />
                                                     <span className="text-xs text-foreground truncate flex-1">
@@ -1352,9 +1300,9 @@ export default function Editor() {
                                                         ] || 0}{" "}
                                                         cr
                                                     </span>
-                                                </motion.div>
+                                                </div>
                                             ))}
-                                        </AnimatePresence>
+                                        </>
                                     </div>
                                 ) : (
                                     <p className="text-xs text-muted-foreground text-center py-4">
@@ -1364,18 +1312,9 @@ export default function Editor() {
                             </div>
 
                             {/* Download Section */}
-                            <AnimatePresence>
+                            <>
                                 {processedImage && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 10 }}
-                                        transition={{
-                                            type: "spring",
-                                            stiffness: 300,
-                                            damping: 25,
-                                        }}
-                                    >
+                                    <div>
                                         <div className="h-px bg-border mb-6" />
                                         <div className="space-y-2">
                                             <Button
@@ -1383,26 +1322,44 @@ export default function Editor() {
                                                 onClick={() =>
                                                     handleExport("png")
                                                 }
+                                                disabled={
+                                                    exportingFormat !== null ||
+                                                    isProcessing
+                                                }
+                                                aria-busy={
+                                                    exportingFormat === "png"
+                                                }
                                                 className="w-full gap-2 cursor-pointer"
                                             >
                                                 <Download className="w-4 h-4" />
-                                                Download PNG
+                                                {exportingFormat === "png"
+                                                    ? "Preparing PNG…"
+                                                    : "Download PNG"}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 onClick={() =>
                                                     handleExport("jpg")
                                                 }
+                                                disabled={
+                                                    exportingFormat !== null ||
+                                                    isProcessing
+                                                }
+                                                aria-busy={
+                                                    exportingFormat === "jpg"
+                                                }
                                                 className="w-full gap-2 cursor-pointer"
                                             >
                                                 <Download className="w-4 h-4" />
-                                                Download JPG
+                                                {exportingFormat === "jpg"
+                                                    ? "Preparing JPG…"
+                                                    : "Download JPG"}
                                             </Button>
                                         </div>
-                                    </motion.div>
+                                    </div>
                                 )}
-                            </AnimatePresence>
-                        </motion.aside>
+                            </>
+                        </aside>
                     </div>
                 </div>
             </section>
