@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -255,13 +254,6 @@
         box-shadow: var(--glow-subtle);
     }
 
-    .transition-smooth {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .transition-bounce {
-        transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    }
-
     .editor-panel {
         background: oklch(0.97 0 0 / 0.85);
         backdrop-filter: blur(24px);
@@ -281,18 +273,9 @@
             oklch(1 0 0 / 0) 100%
         );
         background-size: 200% 100%;
-        animation: shimmer 1.8s ease-in-out infinite;
-    }
-
-    .tool-card {
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .tool-card:hover:not(:disabled) {
-        transform: translateY(-1px);
         box-shadow: 0 4px 20px oklch(0 0 0 / 0.12);
-    }
-    .tool-card:active:not(:disabled) {
-        transform: translateY(0) scale(0.98);
     }
 
     .canvas-checkerboard {
@@ -325,40 +308,72 @@
     }
 }
 
-@keyframes shimmer {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
-    }
-}
-
-@keyframes pulse-ring {
-    0% {
-        transform: scale(0.8);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(2.4);
-        opacity: 0;
-    }
-}
-
 @media (hover: hover) and (pointer: fine) {
     .brand-home-link:hover {
         opacity: 0.76;
     }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .brand-home-link {
-        transition:
-            opacity 150ms ease,
-            transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
-    }
-
-    .brand-home-link:active {
-        transform: scale(0.98);
-    }
+/* UI state changes are immediate. The only animation exception is the
+   explicitly approved hero backdrop. */
+html {
+    scroll-behavior: auto;
+}
+*,
+*::before,
+*::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+}
+body *:not([data-hero-drift]),
+body *::before,
+body *::after {
+    animation: none !important;
+}
+.app-loader-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgb(0 0 0 / 12%);
+}
+.dark .app-loader-backdrop {
+    background: rgb(0 0 0 / 24%);
+}
+.app-loader {
+    box-sizing: border-box;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 10001;
+    transform: translate(-50%, -50%);
+    width: max-content;
+    max-width: min(280px, calc(100vw - 32px));
+    padding: 16px;
+    border-radius: 16px;
+    background: var(--background);
+    color: var(--foreground);
+    box-shadow: 0 16px 56px -12px rgb(0 0 0 / 20%);
+    outline: none;
+}
+.app-loader-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.app-loader-mark {
+    width: 44px;
+    height: 44px;
+}
+.app-loader-name {
+    margin-top: 12px;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+.app-loader-label {
+    margin-top: 8px;
+    color: var(--muted-foreground);
+    font-size: 14px;
+    line-height: 1.5;
 }
