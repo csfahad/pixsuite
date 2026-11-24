@@ -1,11 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import {
+    useAppRouter as useRouter,
+    useNavigationFeedback,
+} from "@/components/navigation-feedback";
+import { toast } from "sonner";
 import { signIn, useSession } from "next-auth/react";
 import { Check, Crown, Rocket, Star, Zap } from "lucide-react";
-import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { GlowingEffect } from "@/components/ui/glowing-effect";
 import PaymentModal from "@/components/modals/payment-modal";
 import { getUpgradePriceDisplayUSD, type PlanType } from "@/lib/plans";
 import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
@@ -85,6 +87,8 @@ export default function Pricing() {
     const router = useRouter();
     const { data: session } = useSession();
     const isAuthenticated = !!session?.user;
+    const { beginAction, finish } = useNavigationFeedback();
+    const [signingInPlan, setSigningInPlan] = useState<string | null>(null);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<
         "Starter" | "Lite" | "Pro"
@@ -100,32 +104,30 @@ export default function Pricing() {
         subscriptionExpiresAt?: string | null;
     } | null>(null);
 
-    useEffect(() => {
-        checkUsage().catch(console.error);
-    }, []);
+    const [usageRevision, setUsageRevision] = useState(0);
 
-    const checkUsage = async () => {
-        try {
-            const response = await fetch("/api/usage");
-            if (response.status === 401) {
-                return null;
-            }
-            if (response.ok) {
-                const data = await response.json();
-                setUsageData(data);
-                setAnalyticsPlan((data.plan || "Free") as PlanType);
-                return data;
-            }
-        } catch (err) {
-            console.error("Failed to check usage:", err);
-        }
-    };
+    useEffect(() => {
+        let cancelled = false;
+        fetch("/api/usage")
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data) => {
+                if (data && !cancelled) {
+                    setUsageData(data);
+                    setAnalyticsPlan(data.plan as PlanType);
+                }
+            })
+            .catch((error) => console.error("Failed to check usage:", error));
+        return () => {
+            cancelled = true;
+        };
+    }, [usageRevision]);
 
     const navigateToEditor = () => {
         router.push("/editor");
     };
 
     const handlePlanClick = (planName: string) => {
+        if (signingInPlan) return;
         trackEvent("plan_selected", {
             selected_plan: planName,
             current_plan: usageData?.plan || "Free",
@@ -142,8 +144,14 @@ export default function Pricing() {
                 source: "pricing",
                 selected_plan: planName,
             });
+            setSigningInPlan(planName);
+            const feedbackToken = beginAction("Opening Google sign-in…");
             signIn("google", {
                 callbackUrl: `/editor?showUpgrade=${planName}`,
+            }).catch(() => {
+                setSigningInPlan(null);
+                finish(feedbackToken);
+                toast.error("Sign-in couldn’t open. Please try again.");
             });
             return;
         }
@@ -209,7 +217,7 @@ export default function Pricing() {
 
     const handlePaymentModalClose = () => {
         setShowPaymentModal(false);
-        checkUsage().catch(console.error);
+        setUsageRevision((revision) => revision + 1);
     };
 
     const getDisplayPrice = (plan: (typeof plans)[0]) => {
@@ -264,13 +272,7 @@ export default function Pricing() {
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
 
             <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 relative z-10">
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8 }}
-                    className="text-center mb-16"
-                >
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center space-x-2 rounded-lg px-4 py-2 mb-6 glass border dark:border-muted-foreground/30">
                         <Zap className="h-4 w-4 text-primary" />
                         <span className="text-sm font-medium">
@@ -288,29 +290,14 @@ export default function Pricing() {
                         Each AI feature has a credit cost. Light users pay less,
                         power users get more. No surprises.
                     </p>
-                </motion.div>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    {plans?.map((plan, index) => (
-                        <motion.div
+                    {plans?.map((plan) => (
+                        <div
                             key={plan.name}
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.5, delay: index * 0.1 }}
                             className={`relative group rounded-2xl ${plan.popular ? "sm:-mt-4 lg:-mt-6" : ""}`}
                         >
-                            <GlowingEffect
-                                blur={0}
-                                borderWidth={3}
-                                spread={80}
-                                glow={true}
-                                disabled={false}
-                                proximity={64}
-                                inactiveZone={0.01}
-                                alwaysActive={plan.popular}
-                            />
-
                             {(plan.popular || plan.proPopular) && (
                                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
                                     <span className="bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full whitespace-nowrap shadow-lg shadow-primary/25">
@@ -323,7 +310,7 @@ export default function Pricing() {
 
                             {/* Card body */}
                             <div
-                                className={`relative h-full flex flex-col rounded-2xl p-6 border transition-all duration-300 ${
+                                className={`relative h-full flex flex-col rounded-2xl p-6 border   ${
                                     plan.popular
                                         ? "border-primary/50 bg-primary/3 shadow-[0_0_30px_-5px] shadow-primary/20"
                                         : "border-border/60 bg-card/50 hover:border-primary/30 hover:bg-card/80"
@@ -336,7 +323,7 @@ export default function Pricing() {
                                             plan.popular
                                                 ? "bg-primary text-primary-foreground"
                                                 : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                                        } transition-colors`}
+                                        } `}
                                     >
                                         <plan.icon className="w-5 h-5" />
                                     </div>
@@ -345,11 +332,13 @@ export default function Pricing() {
                                         <h3 className="text-lg font-bold text-foreground">
                                             {plan.name}
                                         </h3>
-                                        {isPlanActive(plan.name) && (
-                                            <span className="px-2 py-0.5 text-[10px] font-semibold bg-primary/15 text-primary rounded-full border border-primary/20">
-                                                Active
-                                            </span>
-                                        )}
+                                        {signingInPlan === plan.name
+                                            ? "Opening sign-in…"
+                                            : isPlanActive(plan.name) && (
+                                                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-primary/15 text-primary rounded-full border border-primary/20">
+                                                      Active
+                                                  </span>
+                                              )}
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
                                         {plan.description}
@@ -413,7 +402,9 @@ export default function Pricing() {
                                             : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
                                     }`}
                                     onClick={() => handlePlanClick(plan.name)}
+                                    aria-busy={signingInPlan === plan.name}
                                     disabled={
+                                        signingInPlan !== null ||
                                         (plan.name === "Free" &&
                                             usageData !== null &&
                                             usageData.plan === "Free" &&
@@ -421,32 +412,28 @@ export default function Pricing() {
                                         !canUpgradeToPlan(plan.name)
                                     }
                                 >
-                                    {isPlanActive(plan.name)
-                                        ? "Current Plan"
-                                        : plan.name === "Free" &&
-                                            usageData !== null &&
-                                            usageData.plan === "Free" &&
-                                            usageData.canUpload === false
-                                          ? "Limit Reached"
-                                          : plan.cta}
+                                    {signingInPlan === plan.name
+                                        ? "Opening sign-in…"
+                                        : isPlanActive(plan.name)
+                                          ? "Current Plan"
+                                          : plan.name === "Free" &&
+                                              usageData !== null &&
+                                              usageData.plan === "Free" &&
+                                              usageData.canUpload === false
+                                            ? "Limit Reached"
+                                            : plan.cta}
                                 </Button>
                             </div>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: 0.4 }}
-                    className="text-center mt-12"
-                >
+                <div className="text-center mt-12">
                     <p className="text-muted-foreground">
                         Each AI tool costs credits. Free tools (crop, resize)
                         always remain free. Upgrade anytime for more credits.
                     </p>
-                </motion.div>
+                </div>
             </div>
 
             {/* Payment Modal */}
@@ -455,7 +442,6 @@ export default function Pricing() {
                 onClose={handlePaymentModalClose}
                 onUpgrade={() => {
                     handlePaymentModalClose();
-                    checkUsage().catch(console.error);
                 }}
                 creditsRemaining={usageData?.creditsRemaining ?? 0}
                 creditLimit={usageData?.creditLimit ?? 0}
