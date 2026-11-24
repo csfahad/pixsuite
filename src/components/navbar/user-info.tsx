@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import {
     BadgeCheckIcon,
@@ -16,12 +17,17 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigationFeedback } from "@/components/navigation-feedback";
+import { LoadingState } from "@/components/loading-state";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import Link from "@/components/navigation-link";
 import { trackEvent, trackSignOut } from "@/lib/analytics";
 
 export default function UserInfo() {
-    const { data: session } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
+    const [signingOut, setSigningOut] = useState(false);
+    const { beginAction, finish } = useNavigationFeedback();
 
     const getInitials = (name: string | null | undefined) => {
         if (!name) return "U";
@@ -31,9 +37,18 @@ export default function UserInfo() {
             : name.substring(0, 2).toUpperCase();
     };
 
-    const handleSignOut = () => {
+    const handleSignOut = async () => {
+        if (signingOut) return;
+        setSigningOut(true);
         trackSignOut();
-        signOut({ callbackUrl: "/" });
+        const token = beginAction("Signing out…");
+        try {
+            await signOut({ callbackUrl: "/" });
+        } catch {
+            finish(token);
+            setSigningOut(false);
+            toast.error("Couldn’t sign out. Try again.");
+        }
     };
 
     const profileImage = session?.user?.image || session?.user?.avatar || "";
@@ -44,20 +59,25 @@ export default function UserInfo() {
         >
             <DropdownMenuTrigger asChild>
                 <Button
+                    aria-busy={signingOut || sessionStatus === "loading"}
                     variant="ghost"
                     size="icon"
                     className="rounded-full cursor-pointer"
                 >
-                    <Avatar>
-                        <AvatarImage
-                            src={profileImage}
-                            alt={session?.user?.name || "User"}
-                            referrerPolicy="no-referrer"
-                        />
-                        <AvatarFallback>
-                            {getInitials(session?.user?.name)}
-                        </AvatarFallback>
-                    </Avatar>
+                    {signingOut ? (
+                        <LoadingState label="" />
+                    ) : (
+                        <Avatar>
+                            <AvatarImage
+                                src={profileImage}
+                                alt={session?.user?.name || "User"}
+                                referrerPolicy="no-referrer"
+                            />
+                            <AvatarFallback>
+                                {getInitials(session?.user?.name)}
+                            </AvatarFallback>
+                        </Avatar>
+                    )}
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -107,9 +127,13 @@ export default function UserInfo() {
                     </Link>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
+                <DropdownMenuItem
+                    variant="destructive"
+                    disabled={signingOut}
+                    onClick={handleSignOut}
+                >
                     <LogOutIcon />
-                    Sign Out
+                    {signingOut ? "Signing out…" : "Sign Out"}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
