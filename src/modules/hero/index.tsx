@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
-import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Play, ArrowRight } from "lucide-react";
+import { ImagePlus, ArrowRight } from "lucide-react";
 import BeforeAfterSlider from "./BeforeAfterSlider";
-import Link from "next/link";
+import Link from "@/components/navigation-link";
+import styles from "./hero.module.css";
+import HeroBackdrop from "./hero-backdrop";
 
 interface UsageData {
     usageCount: number;
@@ -43,223 +44,137 @@ export default function Hero() {
     const scrollToSection = (sectionId: string) => {
         const element = document.getElementById(sectionId);
         if (element) {
-            element.scrollIntoView({ behavior: "smooth" });
+            element.scrollIntoView({
+                behavior: "instant",
+            });
         }
     };
 
     return (
-        <div>
-            <section
-                id="hero"
-                className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20"
-            >
-                {/* Background Gradient */}
-                <div className="absolute inset-0 bg-linear-to-br from-accent via-background to-muted opacity-50" />
-
-                {/* Floating orbs */}
-                <div className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-float" />
-                <div
-                    className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl animate-float"
-                    style={{ animationDelay: "-1s" }}
-                />
-
-                <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 grid gap-12 items-center justify-center relative z-10">
-                    {/* Left Content */}
-                    <motion.div
-                        initial={{ opacity: 0, x: -50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.8 }}
-                        className="text-center"
-                    >
-                        <motion.h1
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                            className="text-5xl lg:text-8xl font-bold leading-tight"
-                        >
-                            <span className="bg-primary bg-clip-text! text-transparent tracking-wide">
-                                PixSuite
-                            </span>
-                        </motion.h1>
-
-                        <motion.h2
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                            className="text-3xl lg:text-6xl font-bold leading-tight mb-3"
-                        >
-                            <span className="text-muted-foreground">
-                                Instantly edit images{" "}
-                                <span className="flex items-center justify-center">
-                                    —`just upload & go!`
-                                </span>
-                            </span>
-                        </motion.h2>
-
-                        <motion.p
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.4 }}
-                            className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
-                        >
-                            Enhance photos with smart AI editing. Remove
-                            backgrounds, boost quality, or add magic in one
-                            click. Just drop your image—{" "}
-                            <span className="font-bold">Pixsuite</span> handles
-                            the rest!
-                        </motion.p>
-
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5 }}
-                            className="flex flex-col sm:flex-row gap-4 justify-center"
-                        >
-                            {isFreePlan && (
-                                <>
-                                    {isFreeAndLimitReached ? (
-                                        <Button
-                                            variant="secondary"
-                                            size="lg"
-                                            disabled
-                                            className="group text-accent-foreground cursor-not-allowed opacity-60"
-                                        >
-                                            <Play className="h-5 w-5 mr-2" />
-                                            Free Limit Reached
-                                        </Button>
-                                    ) : (
+        <section id="hero" className={styles.hero}>
+            <div className={styles.heroInner}>
+                <div className={styles.intro}>
+                    <h1 className={styles.title}>AI Photo editing tool</h1>
+                    <p className={styles.subtitle}>
+                        Upload a photo. Pick an edit.
+                    </p>
+                    <p className={styles.description}>
+                        Remove backgrounds, refine details, and change the
+                        scene. Start with your image.
+                    </p>
+                    <div className={styles.actions}>
+                        {isFreePlan && (
+                            <>
+                                {isFreeAndLimitReached ? (
+                                    <Button
+                                        variant="secondary"
+                                        size="lg"
+                                        disabled
+                                        className="group text-secondary-foreground cursor-not-allowed opacity-60"
+                                    >
+                                        <ImagePlus className="h-4 w-4 mr-2" />
+                                        Free Limit Reached
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        asChild
+                                        variant="secondary"
+                                        size="lg"
+                                        className="group text-secondary-foreground cursor-pointer w-full"
+                                    >
                                         <Link href="/editor">
-                                            <Button
-                                                variant="secondary"
-                                                size="lg"
-                                                className="group text-accent-foreground cursor-pointer w-full"
-                                            >
-                                                <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
-                                                Try Free Now
-                                            </Button>
+                                            <ImagePlus className="h-4 w-4 mr-2" />
+                                            Try Free Now
                                         </Link>
-                                    )}
-                                    <Button
-                                        variant="default"
-                                        size="lg"
-                                        onClick={() =>
-                                            scrollToSection("pricing")
-                                        }
-                                        className="group cursor-pointer"
-                                    >
-                                        Start Plan
-                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
                                     </Button>
-                                </>
-                            )}
+                                )}
+                                <Button
+                                    variant="default"
+                                    size="lg"
+                                    onClick={() => scrollToSection("pricing")}
+                                    className="group cursor-pointer"
+                                >
+                                    Start Plan
+                                    <ArrowRight className="h-5 w-5 ml-2 " />
+                                </Button>
+                            </>
+                        )}
 
-                            {isStarterPlan && (
-                                <>
-                                    <Button
-                                        variant="secondary"
-                                        size="lg"
-                                        onClick={() =>
-                                            scrollToSection("pricing")
-                                        }
-                                        className="group cursor-pointer"
-                                    >
-                                        Upgrade Plan
-                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                                    </Button>
+                        {isStarterPlan && (
+                            <>
+                                <Button
+                                    variant="secondary"
+                                    size="lg"
+                                    onClick={() => scrollToSection("pricing")}
+                                    className="group cursor-pointer"
+                                >
+                                    Upgrade Plan
+                                    <ArrowRight className="h-5 w-5 ml-2 " />
+                                </Button>
+                                <Button
+                                    asChild
+                                    variant="default"
+                                    size="lg"
+                                    className="group text-primary-foreground cursor-pointer w-full"
+                                >
                                     <Link href="/editor">
-                                        <Button
-                                            variant="default"
-                                            size="lg"
-                                            className="group text-background cursor-pointer w-full"
-                                        >
-                                            <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
-                                            Start Editing
-                                        </Button>
-                                    </Link>
-                                </>
-                            )}
-
-                            {isLitePlan && (
-                                <>
-                                    <Button
-                                        variant="secondary"
-                                        size="lg"
-                                        onClick={() =>
-                                            scrollToSection("pricing")
-                                        }
-                                        className="group cursor-pointer"
-                                    >
-                                        Switch to Pro
-                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                                    </Button>
-                                    <Link href="/editor">
-                                        <Button
-                                            variant="default"
-                                            size="lg"
-                                            className="group text-background cursor-pointer w-full"
-                                        >
-                                            <Play className="h-5 w-5 mr-2 group-hover:animate-pulse" />
-                                            Start Editing
-                                        </Button>
-                                    </Link>
-                                </>
-                            )}
-
-                            {isProPlan && (
-                                <Link href="/editor">
-                                    <Button
-                                        variant="default"
-                                        size="lg"
-                                        className="group text-background cursor-pointer w-full"
-                                    >
+                                        <ImagePlus className="h-4 w-4 mr-2" />
                                         Start Editing
-                                        <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                                    </Button>
+                                    </Link>
+                                </Button>
+                            </>
+                        )}
+
+                        {isLitePlan && (
+                            <>
+                                <Button
+                                    variant="secondary"
+                                    size="lg"
+                                    onClick={() => scrollToSection("pricing")}
+                                    className="group cursor-pointer"
+                                >
+                                    Switch to Pro
+                                    <ArrowRight className="h-5 w-5 ml-2 " />
+                                </Button>
+                                <Button
+                                    asChild
+                                    variant="default"
+                                    size="lg"
+                                    className="group text-primary-foreground cursor-pointer w-full"
+                                >
+                                    <Link href="/editor">
+                                        <ImagePlus className="h-4 w-4 mr-2" />
+                                        Start Editing
+                                    </Link>
+                                </Button>
+                            </>
+                        )}
+
+                        {isProPlan && (
+                            <Button
+                                asChild
+                                variant="default"
+                                size="lg"
+                                className="group text-primary-foreground cursor-pointer w-full"
+                            >
+                                <Link href="/editor">
+                                    Start Editing
+                                    <ArrowRight className="h-5 w-5 ml-2 " />
                                 </Link>
-                            )}
-                        </motion.div>
-
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.6 }}
-                            className="mt-8 flex justify-center"
-                        >
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-3 text-sm text-muted-foreground">
-                                <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-chart-1 rounded-full animate-pulse shrink-0" />
-                                    <span>Explore free, no card needed</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-chart-2 rounded-full animate-pulse shrink-0" />
-                                    <span>Starter — perfect kickoff</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <div
-                                        className="w-2 h-2 rounded-full animate-pulse shrink-0"
-                                        style={{ backgroundColor: "#8b5cf6" }}
-                                    />
-                                    <span>Lite — power without limits</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse shrink-0" />
-                                    <span>Pro — unlimited creativity</span>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-
-                    {/* Right Content - Before/After Slider */}
-                    <motion.div
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                        className="flex justify-center"
-                    >
-                        <BeforeAfterSlider />
-                    </motion.div>
+                            </Button>
+                        )}
+                    </div>
+                    {isFreePlan && (
+                        <p className={styles.trialNote}>
+                            3 free uploads <span aria-hidden="true" /> No card
+                            needed
+                        </p>
+                    )}
                 </div>
-            </section>
-        </div>
+                <HeroBackdrop>
+                    <BeforeAfterSlider />
+                </HeroBackdrop>
+            </div>
+        </section>
     );
 }
