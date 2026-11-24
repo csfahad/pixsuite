@@ -1,7 +1,6 @@
 "use client";
-import { motion } from "motion/react";
 import { Heart } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/navigation-link";
 import { BrandLogo } from "@/components/brand/logo";
 
 export default function Footer() {
@@ -12,13 +11,7 @@ export default function Footer() {
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
 
             <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8 }}
-                    className="text-center"
-                >
+                <div className="text-center">
                     {/* Logo */}
                     <div className="flex justify-center mb-6">
                         <Link
@@ -44,7 +37,7 @@ export default function Footer() {
 
                     <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
                         <span>Made with</span>
-                        <Heart className="h-4 w-4 text-destructive animate-pulse" />
+                        <Heart className="h-4 w-4 text-destructive " />
                         <span>for creators everywhere</span>
                     </div>
 
@@ -75,21 +68,21 @@ export default function Footer() {
                             <div className="flex items-center space-x-4">
                                 <Link
                                     href="/terms"
-                                    className="hover:text-primary transition-colors"
+                                    className="hover:text-primary "
                                 >
                                     Terms of Service
                                 </Link>
                                 <span>•</span>
                                 <Link
                                     href="/privacy"
-                                    className="hover:text-primary transition-colors"
+                                    className="hover:text-primary "
                                 >
                                     Privacy Policy
                                 </Link>
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </div>
             </div>
         </footer>
     );
