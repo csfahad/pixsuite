@@ -1,19 +1,16 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 
 export default function ModeToggle() {
     const { theme, resolvedTheme, setTheme } = useTheme();
-    const [isAnimating, setIsAnimating] = useState(false);
 
     const toggleTheme = () => {
         trackEvent("theme_changed", {
             theme: (resolvedTheme || theme) === "dark" ? "light" : "dark",
         });
-        setIsAnimating(true);
 
         if (!theme || theme === "system") {
             if (resolvedTheme === "dark") {
@@ -28,10 +25,6 @@ export default function ModeToggle() {
                 setTheme("dark");
             }
         }
-
-        setTimeout(() => {
-            setIsAnimating(false);
-        }, 300);
     };
 
     return (
@@ -39,7 +32,7 @@ export default function ModeToggle() {
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
-            className="cursor-pointer group/toggle extend-touch-target h-10 w-10 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 transition-all duration-300 ease-in-out active:scale-95"
+            className="cursor-pointer group/toggle extend-touch-target h-10 w-10 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50    "
         >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -51,9 +44,7 @@ export default function ModeToggle() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={`size-5 transition-all duration-300 ease-in-out ${
-                    isAnimating ? "rotate-180 scale-110" : ""
-                }`}
+                className="size-5"
             >
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
