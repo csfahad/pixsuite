@@ -52,6 +52,8 @@ export async function trackPaymentOutcome(
                         : "checkout_failed",
                 properties: {
                     distinct_id: distinctId,
+                    // Webhooks originate from a server, without a visitor IP.
+                    $geoip_disable: true,
                     ...(typeof order.notes?.analyticsSessionId === "string" &&
                     order.notes.analyticsSessionId
                         ? { $session_id: order.notes.analyticsSessionId }
