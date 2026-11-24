@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { signIn } from "next-auth/react";
-import { motion, AnimatePresence } from "motion/react";
 import { Check, Crown, LogIn, Rocket, X, Zap } from "lucide-react";
+import { useNavigationFeedback } from "@/components/navigation-feedback";
+import { LoadingState } from "@/components/loading-state";
+import { BrandMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { getAnalyticsSessionId, trackEvent } from "@/lib/analytics";
 import {
@@ -124,6 +126,11 @@ export default function PaymentModal({
     isAuthenticated = true,
 }: PaymentModalProps) {
     const [isLoading, setIsLoading] = useState(false);
+    const [signingIn, setSigningIn] = useState(false);
+    const [sdkReady, setSdkReady] = useState(false);
+    const [sdkError, setSdkError] = useState(false);
+    const [sdkRetry, setSdkRetry] = useState(0);
+    const { beginAction, finish } = useNavigationFeedback();
     const [mounted, setMounted] = useState(false);
     const viewedModal = useRef(false);
 
@@ -157,22 +164,33 @@ export default function PaymentModal({
 
     // load razorpay checkout script
     useEffect(() => {
-        if (!isOpen) return;
-
+        if (!isOpen || !isAuthenticated) return;
+        if (window.Razorpay) {
+            setSdkReady(true);
+            return;
+        }
+        setSdkError(false);
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         script.async = true;
-        script.onload = () => trackEvent("checkout_sdk_loaded");
-        script.onerror = () =>
+        script.onload = () => {
+            setSdkReady(true);
+            trackEvent("checkout_sdk_loaded");
+        };
+        script.onerror = () => {
+            setSdkError(true);
             trackEvent("checkout_sdk_failed", { source: script.src });
+        };
         document.body.appendChild(script);
 
         return () => {
             document.body.removeChild(script);
         };
-    }, [isOpen]);
+    }, [isOpen, isAuthenticated, sdkRetry]);
 
     const handleUpgrade = async () => {
+        if (isLoading || !sdkReady) return;
+        const token = beginAction("Opening checkout…");
         trackEvent("checkout_started", {
             selected_plan: plan,
             current_plan: currentPlan,
@@ -335,6 +353,7 @@ export default function PaymentModal({
             });
             onClose();
             razorpay.open();
+            finish(token);
             trackEvent("checkout_opened", {
                 ...checkoutProperties,
             });
@@ -344,6 +363,7 @@ export default function PaymentModal({
                 stage,
                 error: err instanceof Error ? err.message : String(err),
             });
+            finish(token);
             console.error("Upgrade failed:", err);
             alert(
                 err instanceof Error
@@ -354,32 +374,48 @@ export default function PaymentModal({
         }
     };
 
+    const handleSignIn = async () => {
+        if (signingIn) return;
+        setSigningIn(true);
+        trackEvent("sign_in_started", {
+            provider: "google",
+            source: "upgrade_modal",
+            selected_plan: plan,
+        });
+        const token = beginAction("Opening Google sign-in…");
+        try {
+            await signIn("google", {
+                callbackUrl: `/editor?showUpgrade=${plan}`,
+            });
+        } catch {
+            finish(token);
+            setSigningIn(false);
+        }
+    };
+
     const PlanIcon = planIcons[plan] || Zap;
     const features = planFeatures[plan] || [];
 
     if (!mounted) return null;
 
     return createPortal(
-        <AnimatePresence>
+        <>
+            {isOpen && isAuthenticated && !sdkReady && !sdkError && (
+                <LoadingState label="Preparing checkout…" />
+            )}
             {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
                     onClick={onClose}
                 >
-                    <motion.div
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.95, opacity: 0 }}
+                    <div
                         className="relative w-full max-w-md glass rounded-xl p-6 border border-primary/20 dark:border-primary/20 shadow-glow-primary mt-12"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Close Button */}
                         <button
                             onClick={onClose}
-                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-accent transition-colors cursor-pointer"
+                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-accent  cursor-pointer"
                         >
                             <X className="h-4 w-4 text-muted-foreground" />
                         </button>
@@ -443,18 +479,41 @@ export default function PaymentModal({
                             </div>
                         </div>
 
+                        {sdkError && (
+                            <div
+                                role="alert"
+                                className="mb-4 text-sm text-destructive"
+                            >
+                                Checkout couldn’t load.{" "}
+                                <button
+                                    type="button"
+                                    className="min-h-11 underline"
+                                    onClick={() =>
+                                        setSdkRetry((value) => value + 1)
+                                    }
+                                >
+                                    Retry checkout
+                                </button>
+                            </div>
+                        )}
                         {/* Action Buttons */}
                         <div className="space-y-3">
                             {isAuthenticated ? (
                                 <Button
                                     onClick={handleUpgrade}
-                                    disabled={isLoading}
-                                    className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary transition-all cursor-pointer"
+                                    disabled={isLoading || !sdkReady}
+                                    aria-busy={isLoading || !sdkReady}
+                                    className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary  cursor-pointer"
                                 >
-                                    {isLoading ? (
+                                    {isLoading || !sdkReady ? (
                                         <>
-                                            <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
-                                            Processing...
+                                            <BrandMark
+                                                className="w-4 h-4 mr-2"
+                                                aria-hidden="true"
+                                            />
+                                            {isLoading
+                                                ? "Opening checkout…"
+                                                : "Loading checkout…"}
                                         </>
                                     ) : (
                                         <>
@@ -465,20 +524,15 @@ export default function PaymentModal({
                                 </Button>
                             ) : (
                                 <Button
-                                    onClick={() => {
-                                        trackEvent("sign_in_started", {
-                                            provider: "google",
-                                            source: "upgrade_modal",
-                                            selected_plan: plan,
-                                        });
-                                        signIn("google", {
-                                            callbackUrl: `/editor?showUpgrade=${plan}`,
-                                        });
-                                    }}
-                                    className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary transition-all cursor-pointer"
+                                    onClick={handleSignIn}
+                                    disabled={signingIn}
+                                    aria-busy={signingIn}
+                                    className="w-full bg-primary text-primary-foreground hover:shadow-glow-primary  cursor-pointer"
                                 >
                                     <LogIn className="h-4 w-4 mr-2" />
-                                    Sign in to Upgrade
+                                    {signingIn
+                                        ? "Opening sign-in…"
+                                        : "Sign in to Upgrade"}
                                 </Button>
                             )}
 
@@ -514,10 +568,10 @@ export default function PaymentModal({
                                 </a>
                             </span>
                         </p>
-                    </motion.div>
-                </motion.div>
+                    </div>
+                </div>
             )}
-        </AnimatePresence>,
+        </>,
         document.body,
     );
 }
