@@ -1,33 +1,31 @@
 "use client";
 import { Crop, Expand, Scissors, Type, Zap } from "lucide-react";
-import { motion } from "motion/react";
 import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
 import Image from "next/image";
 
 type FeaturesImageProps = {
     title:
-    | "AI Background Removal"
-    | "AI Generative Fill"
-    | "AI Upscale & Enhance"
-    | "Smart Crop & Face Focus"
-    | "Watermark & Text Overlay";
+        | "AI Background Removal"
+        | "AI Generative Fill"
+        | "AI Upscale & Enhance"
+        | "Smart Crop & Face Focus"
+        | "Watermark & Text Overlay";
 };
 
 const UpscaleSimulation = ({ title }: { title: string }) => {
-    const upscaleImg = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=640&q=80";
+    const upscaleImg =
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=640&q=80";
 
     return (
         <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <motion.div
-                initial={{ scale: 1 }}
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full h-full absolute inset-0 flex bg-neutral-900"
-
-            >
+            <div className="w-full h-full absolute inset-0 flex bg-neutral-900">
                 {/* Left Side: Blurry (Before) */}
                 <div className="w-1/2 h-full relative overflow-hidden z-10">
-                    <img src={upscaleImg} alt={title} className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center blur-sm scale-[1.12]" />
+                    <img
+                        src={upscaleImg}
+                        alt={title}
+                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center blur-sm scale-[1.12]"
+                    />
                 </div>
 
                 {/* Right Side: Enhanced (After) */}
@@ -38,38 +36,45 @@ const UpscaleSimulation = ({ title }: { title: string }) => {
                         className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center -left-full"
                     />
                 </div>
-            </motion.div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-20" />
+            </div>
+            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none z-20" />
         </div>
     );
 };
 
 const WatermarkSimulation = ({ title }: { title: string }) => {
-    const watermarkImg = "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=640&q=80";
+    const watermarkImg =
+        "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=640&q=80";
 
     return (
         <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <motion.div
-                initial={{ scale: 1 }}
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full h-full absolute inset-0 flex bg-neutral-900"
-            >
+            <div className="w-full h-full absolute inset-0 flex bg-neutral-900">
                 {/* Left Side: Original Image */}
                 <div className="w-1/2 h-full relative overflow-hidden border-r-2 border-primary z-10">
-                    <img src={watermarkImg} alt={title} className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center" />
+                    <img
+                        src={watermarkImg}
+                        alt={title}
+                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center"
+                    />
                 </div>
 
                 {/* Right Side: Watermarked Image */}
                 <div className="w-1/2 h-full relative overflow-hidden">
-                    <img src={watermarkImg} alt={title} className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center -left-full" />
+                    <img
+                        src={watermarkImg}
+                        alt={title}
+                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center -left-full"
+                    />
 
                     {/* High-end Watermark UI Overlay */}
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
                         {/* Subtle repeated pattern */}
-                        <div className="absolute inset-0 opacity-40 mix-blend-overlay" style={{
-                            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><text x='10' y='60' fill='white' font-family='sans-serif' font-size='14' font-weight='800' letter-spacing='2' transform='rotate(-30 60 60)'>CREATOR</text></svg>")`
-                        }}></div>
+                        <div
+                            className="absolute inset-0 opacity-40 mix-blend-overlay"
+                            style={{
+                                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><text x='10' y='60' fill='white' font-family='sans-serif' font-size='14' font-weight='800' letter-spacing='2' transform='rotate(-30 60 60)'>CREATOR</text></svg>")`,
+                            }}
+                        ></div>
 
                         {/* Bold central watermark */}
                         <div className="absolute inset-0 flex items-center justify-center opacity-90 drop-shadow-2xl mix-blend-overlay">
@@ -79,40 +84,43 @@ const WatermarkSimulation = ({ title }: { title: string }) => {
                         </div>
                     </div>
                 </div>
-            </motion.div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-20" />
+            </div>
+            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none z-20" />
         </div>
     );
 };
 
 const BgRemovalSimulation = ({ title }: { title: string }) => {
-    const bgRemovalImg = "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=640&q=80";
+    const bgRemovalImg =
+        "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=640&q=80";
 
     return (
         <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <motion.div
-                initial={{ scale: 1 }}
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full h-full absolute inset-0 flex bg-white"
-            >
+            <div className="w-full h-full absolute inset-0 flex bg-white">
                 {/* Left Side: Original Image */}
                 <div className="w-1/2 h-full relative overflow-hidden border-r-2 border-primary z-10">
-                    <img src={bgRemovalImg} alt={title} className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center" />
+                    <img
+                        src={bgRemovalImg}
+                        alt={title}
+                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center"
+                    />
                 </div>
 
                 {/* Right Side: Simulated Background Removal via CSS mixed blending magic */}
-                <div className="w-1/2 h-full relative overflow-hidden bg-neutral-100" style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23d4d4d8' d='M0 0h8v8H0zM8 8h8v8H8z'/%3E%3Cpath fill='%23e4e4e7' d='M8 0h8v8H8zM0 8h8v8H0z'/%3E%3C/svg%3E")`
-                }}>
+                <div
+                    className="w-1/2 h-full relative overflow-hidden bg-neutral-100"
+                    style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23d4d4d8' d='M0 0h8v8H0zM8 8h8v8H8z'/%3E%3Cpath fill='%23e4e4e7' d='M8 0h8v8H8zM0 8h8v8H0z'/%3E%3C/svg%3E")`,
+                    }}
+                >
                     <img
                         src={bgRemovalImg}
                         alt={title}
                         className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center -left-full mix-blend-multiply opacity-95 contrast-125"
                     />
                 </div>
-            </motion.div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-20" />
+            </div>
+            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none z-20" />
         </div>
     );
 };
@@ -130,33 +138,26 @@ const CustomFeatureMedia = ({
 }) => {
     return (
         <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <motion.div
-                initial={{ scale: 1 }}
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full h-full absolute inset-0 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800"
-            >
+            <div className="w-full h-full absolute inset-0 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800">
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {type === "video" ? (
-                        <video
-                            src={src}
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            className={`w-full h-full object-cover ${cropScale ? 'origin-[center_60%]' : ''}`}
-                            style={cropScale ? { transform: `scale(${cropScale})` } : undefined}
-                        />
-                    ) : (
-                        <img
-                            src={src}
-                            alt={title}
-                            className="w-full h-full object-cover"
-                        />
-                    )}
+                    <img
+                        src={
+                            type === "video"
+                                ? src.replace(".webm", "-poster.webp")
+                                : src
+                        }
+                        alt={title}
+                        loading="lazy"
+                        className={`w-full h-full object-cover ${cropScale ? "origin-[center_60%]" : ""}`}
+                        style={
+                            cropScale
+                                ? { transform: `scale(${cropScale})` }
+                                : undefined
+                        }
+                    />
                 </div>
-            </motion.div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/40 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+            </div>
+            <div className="absolute inset-0 bg-linear-to-tr from-black/40 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none" />
         </div>
     );
 };
@@ -172,10 +173,24 @@ const FeaturesImage = ({ title }: FeaturesImageProps) => {
         return <WatermarkSimulation title={title} />;
     }
     if (title === "AI Generative Fill") {
-        return <CustomFeatureMedia src="/features/gen-fill.webm" type="video" title={title} cropScale={1.5} />;
+        return (
+            <CustomFeatureMedia
+                src="/features/gen-fill.webm"
+                type="video"
+                title={title}
+                cropScale={1.5}
+            />
+        );
     }
     if (title === "Smart Crop & Face Focus") {
-        return <CustomFeatureMedia src="/features/smart-crop.webm" type="video" title={title} cropScale={1.6} />;
+        return (
+            <CustomFeatureMedia
+                src="/features/smart-crop.webm"
+                type="video"
+                title={title}
+                cropScale={1.6}
+            />
+        );
     }
 
     const imageMap: Record<FeaturesImageProps["title"], string> = {
@@ -196,12 +211,7 @@ const FeaturesImage = ({ title }: FeaturesImageProps) => {
     return (
         <div className="flex flex-col flex-1 w-full h-full min-h-24 rounded-xl bg-linear-to-br from-neutral-200 dark:from-neutral-900 dark:to-neutral-800 to-neutral-100 overflow-hidden group">
             {imgSrc && (
-                <motion.div
-                    initial={{ scale: 1 }}
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                    className="w-full aspect-video rounded-xl overflow-hidden relative"
-                >
+                <div className="w-full aspect-video rounded-xl overflow-hidden relative">
                     <Image
                         src={imgSrc}
                         alt={title}
@@ -213,8 +223,8 @@ const FeaturesImage = ({ title }: FeaturesImageProps) => {
                         priority={false}
                         unoptimized={false}
                     />
-                    <div className="absolute inset-0 bg-linear-to-tr from-black/40 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                </motion.div>
+                    <div className="absolute inset-0 bg-linear-to-tr from-black/40 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none" />
+                </div>
             )}
         </div>
     );
@@ -271,13 +281,7 @@ export default function Features() {
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
 
             <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8 }}
-                    className="text-center mb-16"
-                >
+                <div className="text-center mb-16">
                     <h2 className="text-4xl lg:text-6xl font-bold mb-6">
                         <span className="text-foreground">Magical </span>
                         <span className="bg-primary bg-clip-text! text-transparent">
@@ -290,7 +294,7 @@ export default function Features() {
                         Each feature is designed to give you professional
                         results in seconds, not hours.
                     </p>
-                </motion.div>
+                </div>
 
                 <BentoGrid className="max-w-6xl mx-auto text-lg ">
                     {features.map((item, i) => (
