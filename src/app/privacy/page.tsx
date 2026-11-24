@@ -1,17 +1,9 @@
-"use client";
-
-import { motion } from "motion/react";
 import Footer from "@/components/footer";
 
 export default function PrivacyPage() {
     return (
         <div className="min-h-screen bg-background pt-18">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="w-full max-w-7xl mx-auto px-6 lg:px-16 py-12"
-            >
+            <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 py-12">
                 <h1 className="text-4xl font-bold mb-8 text-foreground">
                     Privacy Policy
                 </h1>
@@ -108,7 +100,7 @@ export default function PrivacyPage() {
                         </p>
                     </section>
                 </div>
-            </motion.div>
+            </div>
             <Footer />
         </div>
     );
