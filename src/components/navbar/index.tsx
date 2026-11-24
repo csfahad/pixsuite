@@ -1,6 +1,4 @@
 "use client";
-
-import { AnimatePresence, motion } from "motion/react";
 import {
     BadgeCheckIcon,
     CreditCardIcon,
@@ -10,12 +8,14 @@ import {
     X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useScroll } from "motion/react";
 import { cn } from "@/lib/utils";
 import { signOut, useSession } from "next-auth/react";
-import Link from "next/link";
+import Link from "@/components/navigation-link";
+import { useNavigationFeedback } from "@/components/navigation-feedback";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useRouter, usePathname } from "next/navigation";
+import { useAppRouter as useRouter } from "@/components/navigation-feedback";
+import { usePathname } from "next/navigation";
 import ModeToggle from "@/components/modeToggle/index";
 import UserInfo from "./user-info";
 import { BrandLogo } from "@/components/brand/logo";
@@ -26,18 +26,19 @@ export default function Navbar() {
     const [menuState, setMenuState] = useState(false);
     const [scrolled, setScrolled] = useState(false);
 
-    const { scrollYProgress } = useScroll();
-    const { data: session } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
+    const [signingOut, setSigningOut] = useState(false);
+    const { beginAction, finish } = useNavigationFeedback();
 
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
-        const unsubscribe = scrollYProgress.on("change", (latest) => {
-            setScrolled(latest > 0.05);
-        });
-        return () => unsubscribe();
-    }, [scrollYProgress]);
+        const updateHeader = () => setScrolled(window.scrollY > 24);
+        updateHeader();
+        window.addEventListener("scroll", updateHeader, { passive: true });
+        return () => window.removeEventListener("scroll", updateHeader);
+    }, []);
 
     const scrollToSection = (sectionId: string) => {
         trackEvent("navigation_selected", {
@@ -50,7 +51,7 @@ export default function Navbar() {
         }
         const element = document.getElementById(sectionId);
         if (element) {
-            element.scrollIntoView({ behavior: "smooth" });
+            element.scrollIntoView({ behavior: "instant" });
         }
     };
 
@@ -77,25 +78,32 @@ export default function Navbar() {
             : name.substring(0, 2).toUpperCase();
     };
 
-    const handleSignOut = () => {
+    const handleSignOut = async () => {
+        if (signingOut) return;
+        setSigningOut(true);
         trackSignOut();
-        signOut({ callbackUrl: "/" });
+        const token = beginAction("Signing out…");
+        try {
+            await signOut({ callbackUrl: "/" });
+        } catch {
+            finish(token);
+            setSigningOut(false);
+            toast.error("Couldn’t sign out. Try again.");
+        }
     };
 
     return (
         <header>
-            <motion.nav
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+            <nav
                 data-state={menuState && "active"}
                 className={cn(
-                    "fixed z-20 w-full transition-colors duration-150",
+                    "fixed z-20 w-full  ",
                     scrolled && "border-b bg-background/50 backdrop-blur-3xl",
                 )}
             >
-                <div className="mx-auto max-w-7xl px-6 lg:px-16 transition-all duration-300">
+                <div className="mx-auto max-w-7xl px-6 lg:px-16  ">
                     <div className="relative flex flex-wrap items-center justify-between gap-4 py-3 lg:py-4">
-                        <motion.div className="flex w-full items-center justify-between space-x-2 lg:w-auto">
+                        <div className="flex w-full items-center justify-between space-x-2 lg:w-auto">
                             <Link
                                 href="/"
                                 aria-label="PixSuite home"
@@ -121,32 +129,38 @@ export default function Navbar() {
                                             ? "Close Menu"
                                             : "Open Menu"
                                     }
+                                    aria-expanded={menuState}
+                                    aria-controls="mobile-navigation"
                                     className="relative z-20 -m-2.5 -mr-4 block cursor-pointer p-2.5"
                                 >
-                                    <Menu className="in-data-[state=active]:rotate-180 in-data-[state=active]:scale-0 in-data-[state=active]:opacity-0 m-auto size-6 duration-200" />
-                                    <X className="in-data-[state=active]:rotate-0 in-data-[state=active]:scale-100 in-data-[state=active]:opacity-100 absolute inset-0 m-auto size-6 -rotate-180 scale-0 opacity-0 duration-200" />
+                                    {menuState ? (
+                                        <X className="m-auto size-6" />
+                                    ) : (
+                                        <Menu className="m-auto size-6" />
+                                    )}
                                 </button>
                             </div>
-                        </motion.div>
+                        </div>
 
                         <div className="hidden lg:flex items-center gap-3">
                             <div className="flex items-center gap-6">
                                 <button
                                     onClick={() => scrollToSection("features")}
-                                    className="text-muted-foreground hover:text-accent-foreground transition-colors cursor-pointer duration-150 whitespace-nowrap"
+                                    className="text-muted-foreground hover:text-accent-foreground  cursor-pointer  whitespace-nowrap"
                                 >
                                     Features
                                 </button>
                                 <button
                                     onClick={() => scrollToSection("pricing")}
-                                    className="text-muted-foreground hover:text-accent-foreground transition-colors cursor-pointer duration-150 whitespace-nowrap"
+                                    className="text-muted-foreground hover:text-accent-foreground  cursor-pointer  whitespace-nowrap"
                                 >
                                     Pricing
                                 </button>
                             </div>
                             <div className="flex items-center gap-3">
                                 <ModeToggle />
-                                {session?.user ? (
+                                {sessionStatus ===
+                                "loading" ? null : session?.user ? (
                                     <UserInfo />
                                 ) : (
                                     <Button
@@ -161,20 +175,13 @@ export default function Navbar() {
                         </div>
                     </div>
                 </div>
-            </motion.nav>
+            </nav>
 
             {/* Mobile menu */}
-            <AnimatePresence>
+            <>
                 {menuState && (
-                    <motion.div
-                        initial={{ x: "100%", opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: "100%", opacity: 0 }}
-                        transition={{
-                            type: "spring",
-                            stiffness: 260,
-                            damping: 30,
-                        }}
+                    <div
+                        id="mobile-navigation"
                         className="fixed inset-0 z-999 lg:hidden"
                     >
                         <div className="absolute inset-0 bg-background" />
@@ -226,7 +233,8 @@ export default function Navbar() {
 
                                 <div className="h-px w-full bg-border/70" />
 
-                                {session?.user ? (
+                                {sessionStatus ===
+                                "loading" ? null : session?.user ? (
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3 px-1">
                                             <Avatar className="h-8 w-8">
@@ -317,7 +325,11 @@ export default function Navbar() {
                                                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-destructive hover:bg-destructive/10"
                                             >
                                                 <LogOutIcon className="h-4 w-4" />
-                                                <span>Sign Out</span>
+                                                <span>
+                                                    {signingOut
+                                                        ? "Signing out…"
+                                                        : "Sign Out"}
+                                                </span>
                                             </button>
                                         </div>
                                     </div>
@@ -337,9 +349,9 @@ export default function Navbar() {
                                 )}
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 )}
-            </AnimatePresence>
+            </>
         </header>
     );
 }
