@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { forwardedClientIp } from "@/lib/forwarded-client-ip.server";
 
 type Context = { params: Promise<{ path: string[] }> };
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
@@ -69,6 +70,11 @@ async function proxy(
     for (const name of ["content-type", "content-encoding", "user-agent"]) {
         const value = request.headers.get(name);
         if (value) headers.set(name, value);
+    }
+
+    if (process.env.NODE_ENV === "production") {
+        const ip = forwardedClientIp(request);
+        if (ip) headers.set("x-forwarded-for", ip);
     }
     try {
         const body =
