@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import Footer from "@/components/footer";
+import Footer from "@/modules/home/footer";
 import Features from "@/modules/features";
 import Hero from "@/modules/hero";
 import Pricing from "@/modules/pricing";
@@ -15,7 +15,7 @@ const PLAN_BENEFITS: Record<
     Starter: {
         credits: "3,000",
         uploads: "500",
-        highlight: "AI-powered editing tools",
+        highlight: "Standard AI editing tools",
     },
     Lite: {
         credits: "10,000",
@@ -25,7 +25,7 @@ const PLAN_BENEFITS: Record<
     Pro: {
         credits: "25,000",
         uploads: "20,000",
-        highlight: "Maximum power for professionals",
+        highlight: "Higher monthly allowances",
     },
 };
 
@@ -104,11 +104,13 @@ export default function Home() {
     }, []);
 
     return (
-        <div>
-            <Hero />
-            <Features />
-            <Pricing />
+        <>
+            <main>
+                <Hero />
+                <Features />
+                <Pricing />
+            </main>
             <Footer />
-        </div>
+        </>
     );
 }
