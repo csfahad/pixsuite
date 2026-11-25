@@ -6,80 +6,66 @@ import {
 } from "@/components/navigation-feedback";
 import { toast } from "sonner";
 import { signIn, useSession } from "next-auth/react";
-import { Check, Crown, Rocket, Star, Zap } from "lucide-react";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PaymentModal from "@/components/modals/payment-modal";
-import { getUpgradePriceDisplayUSD, type PlanType } from "@/lib/plans";
+import {
+    PLAN_CREDIT_LIMITS,
+    PLAN_UPLOAD_LIMITS,
+    getUpgradePriceDisplayUSD,
+    type PlanType,
+} from "@/lib/plans";
+import styles from "@/modules/home/home.module.css";
 import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
 
 const plans = [
     {
         name: "Free" as PlanType,
         price: "$0",
-        period: "forever",
-        description: "Try out PixSuite basics",
+        description: "Cropping only",
         features: [
-            "3 uploads",
-            "Smart crop & face crop (free)",
-            "Basic transforms (resize, format, compress)",
-            "Community support",
+            "Smart crop and face crop",
+            "Compare with the original",
+            "Download the result",
         ],
-        limitations: ["No AI credits", "Limited uploads"],
-        cta: "Start Free",
-        popular: false,
-        icon: Star,
+        cta: "Try for free",
+        featured: false,
     },
     {
         name: "Starter" as PlanType,
         price: "$9",
-        period: "per month",
-        description: "For casual creators getting started",
+        description: "Standard AI tools",
         features: [
-            "3,000 AI Credits/month",
-            "500 uploads/month",
-            "All basic AI features",
-            "Unlimited basic transforms",
-            "Email support",
+            "Background and prompt edits",
+            "Retouch, upscale, and variations",
+            "Crop tools included",
         ],
-        limitations: ["No Pro BG removal"],
-        cta: "Go Starter",
-        popular: false,
-        icon: Zap,
+        cta: "Choose Starter",
+        featured: false,
     },
     {
         name: "Lite" as PlanType,
         price: "$29",
-        period: "per month",
-        description: "For growing creators with higher needs",
+        description: "All AI tools",
         features: [
-            "10,000 AI Credits/month",
-            "5,000 uploads/month",
-            "All AI features unlocked",
-            "Priority processing",
-            "Pro BG removal included",
+            "Standard AI tools included",
+            "Pro background removal",
+            "Crop tools included",
         ],
-        cta: "Go Lite",
-        popular: true,
-        icon: Rocket,
+        cta: "Choose Lite",
+        featured: true,
     },
     {
         name: "Pro" as PlanType,
         price: "$59",
-        period: "per month",
-        description: "Maximum power for professionals",
+        description: "All AI tools",
         features: [
-            "25,000 AI Credits/month",
-            "20,000 uploads/month",
-            "All AI features unlocked",
-            "Fastest processing",
-            "API access",
-            "Priority support",
-            "Early access to new features",
+            "Standard AI tools included",
+            "Pro background removal",
+            "Crop tools included",
         ],
-        cta: "Go Pro",
-        popular: false,
-        proPopular: true,
-        icon: Crown,
+        cta: "Choose Pro",
+        featured: false,
     },
 ];
 
@@ -266,183 +252,115 @@ export default function Pricing() {
     };
 
     return (
-        <section id="pricing" className="pt-20 pb-10 relative overflow-hidden">
-            {/* Background effects */}
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
-
-            <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 relative z-10">
-                <div className="text-center mb-16">
-                    <div className="inline-flex items-center space-x-2 rounded-lg px-4 py-2 mb-6 glass border dark:border-muted-foreground/30">
-                        <Zap className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">
-                            Credit-Based Pricing
-                        </span>
-                    </div>
-
-                    <h2 className="text-4xl lg:text-6xl font-bold mb-6">
-                        <span className="text-foreground">Pay for What </span>
-                        <span className="bg-primary bg-clip-text! text-transparent">
-                            You Use
-                        </span>
-                    </h2>
-                    <p className="text-base md:text-xl text-muted-foreground max-w-3xl mx-auto">
-                        Each AI feature has a credit cost. Light users pay less,
-                        power users get more. No surprises.
+        <section id="pricing" className={styles.pricingSection}>
+            <div className={styles.container}>
+                <div className={styles.pricingHeader}>
+                    <h2>Plans for how often you edit.</h2>
+                    <p>
+                        Start with three free uploads. Paid plans add AI credits
+                        and a monthly upload allowance.
                     </p>
                 </div>
+                <div className={styles.plans}>
+                    {plans.map((plan) => {
+                        const active = isPlanActive(plan.name);
+                        const canUpgrade = canUpgradeToPlan(plan.name);
+                        const exhausted =
+                            plan.name === "Free" &&
+                            usageData?.plan === "Free" &&
+                            usageData.canUpload === false;
+                        let actionLabel = plan.cta;
+                        if (signingInPlan === plan.name)
+                            actionLabel = "Opening sign-in…";
+                        else if (exhausted)
+                            actionLabel = "Upload limit reached";
+                        else if (active && plan.name !== "Free")
+                            actionLabel = "Current plan";
+                        else if (!canUpgrade) actionLabel = "Included";
+                        else if (active) actionLabel = "Open editor";
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    {plans?.map((plan) => (
-                        <div
-                            key={plan.name}
-                            className={`relative group rounded-2xl ${plan.popular ? "sm:-mt-4 lg:-mt-6" : ""}`}
-                        >
-                            {(plan.popular || plan.proPopular) && (
-                                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
-                                    <span className="bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full whitespace-nowrap shadow-lg shadow-primary/25">
-                                        {plan.popular
-                                            ? "Most Popular"
-                                            : "Best Value"}
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* Card body */}
-                            <div
-                                className={`relative h-full flex flex-col rounded-2xl p-6 border   ${
-                                    plan.popular
-                                        ? "border-primary/50 bg-primary/3 shadow-[0_0_30px_-5px] shadow-primary/20"
-                                        : "border-border/60 bg-card/50 hover:border-primary/30 hover:bg-card/80"
-                                }`}
+                        return (
+                            <article
+                                key={plan.name}
+                                className={`${styles.plan} ${plan.featured ? styles.featuredPlan : ""}`}
                             >
-                                {/* Header */}
-                                <div className="mb-5">
-                                    <div
-                                        className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-3 ${
-                                            plan.popular
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                                        } `}
-                                    >
-                                        <plan.icon className="w-5 h-5" />
-                                    </div>
-
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-lg font-bold text-foreground">
-                                            {plan.name}
-                                        </h3>
-                                        {signingInPlan === plan.name
-                                            ? "Opening sign-in…"
-                                            : isPlanActive(plan.name) && (
-                                                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-primary/15 text-primary rounded-full border border-primary/20">
-                                                      Active
-                                                  </span>
-                                              )}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        {plan.description}
-                                    </p>
-                                </div>
-
-                                {/* Price */}
-                                <div className="mb-5 pb-5 border-b border-border/50">
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-bold text-foreground tracking-tight">
-                                            {getDisplayPrice(plan)}
+                                <div className={styles.planHeading}>
+                                    <h3>{plan.name}</h3>
+                                    {active && (
+                                        <span className={styles.activePlan}>
+                                            Your plan
                                         </span>
-                                        <span className="text-sm text-muted-foreground">
-                                            /{plan.period}
-                                        </span>
-                                    </div>
-                                    {isProRata(plan.name) && (
-                                        <p className="text-xs text-primary font-medium mt-1">
-                                            Pro-rata upgrade price
-                                        </p>
                                     )}
                                 </div>
-
-                                {/* Features */}
-                                <div className="space-y-3 mb-6 flex-1">
-                                    {plan?.features?.map((feature, fi) => (
-                                        <div
-                                            key={fi}
-                                            className="flex items-start gap-2.5"
-                                        >
-                                            <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                                            <span className="text-sm text-muted-foreground leading-snug">
-                                                {feature}
-                                            </span>
-                                        </div>
-                                    ))}
-
-                                    {plan?.limitations?.map((limitation) => (
-                                        <div
-                                            key={limitation}
-                                            className="flex items-start gap-2.5"
-                                        >
-                                            <div className="w-4 h-4 shrink-0 mt-0.5 flex items-center justify-center">
-                                                <div className="w-2.5 h-0.5 bg-muted-foreground/40 rounded-full" />
-                                            </div>
-                                            <span className="text-sm text-muted-foreground/60 leading-snug">
-                                                {limitation}
-                                            </span>
-                                        </div>
-                                    ))}
+                                <div className={styles.planPrice}>
+                                    <span>{getDisplayPrice(plan)}</span>
+                                    <span>
+                                        {plan.name === "Free"
+                                            ? "trial"
+                                            : isProRata(plan.name)
+                                              ? "upgrade"
+                                              : "/ month"}
+                                    </span>
                                 </div>
-
-                                {/* CTA Button */}
+                                <p className={styles.priceContext}>
+                                    {isProRata(plan.name)
+                                        ? "Upgrade charge today"
+                                        : plan.description}
+                                </p>
+                                <dl className={styles.allowances}>
+                                    <div>
+                                        <dt>AI credits</dt>
+                                        <dd>
+                                            {PLAN_CREDIT_LIMITS[
+                                                plan.name
+                                            ].toLocaleString("en-US")}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt>
+                                            {plan.name === "Free"
+                                                ? "Trial uploads"
+                                                : "Uploads / month"}
+                                        </dt>
+                                        <dd>
+                                            {PLAN_UPLOAD_LIMITS[
+                                                plan.name
+                                            ].toLocaleString("en-US")}
+                                        </dd>
+                                    </div>
+                                </dl>
+                                <ul className={styles.planFeatures}>
+                                    {plan.features.map((feature) => (
+                                        <li key={feature}>
+                                            <Check size={13} aria-hidden />{" "}
+                                            <span>{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
                                 <Button
                                     variant={
-                                        plan.popular ? "default" : "outline"
+                                        plan.featured ? "default" : "outline"
                                     }
-                                    className={`w-full font-semibold cursor-pointer rounded-xl h-11 ${
-                                        plan.popular
-                                            ? ""
-                                            : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                                    }`}
+                                    className={styles.planAction}
                                     onClick={() => handlePlanClick(plan.name)}
                                     aria-busy={signingInPlan === plan.name}
                                     disabled={
                                         signingInPlan !== null ||
-                                        (plan.name === "Free" &&
-                                            usageData !== null &&
-                                            usageData.plan === "Free" &&
-                                            usageData.canUpload === false) ||
-                                        !canUpgradeToPlan(plan.name)
+                                        exhausted ||
+                                        !canUpgrade
                                     }
                                 >
-                                    {signingInPlan === plan.name
-                                        ? "Opening sign-in…"
-                                        : isPlanActive(plan.name)
-                                          ? "Current Plan"
-                                          : plan.name === "Free" &&
-                                              usageData !== null &&
-                                              usageData.plan === "Free" &&
-                                              usageData.canUpload === false
-                                            ? "Limit Reached"
-                                            : plan.cta}
+                                    {actionLabel}
                                 </Button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                <div className="text-center mt-12">
-                    <p className="text-muted-foreground">
-                        Each AI tool costs credits. Free tools (crop, resize)
-                        always remain free. Upgrade anytime for more credits.
-                    </p>
+                            </article>
+                        );
+                    })}
                 </div>
             </div>
-
-            {/* Payment Modal */}
             <PaymentModal
                 isOpen={showPaymentModal}
                 onClose={handlePaymentModalClose}
-                onUpgrade={() => {
-                    handlePaymentModalClose();
-                }}
+                onUpgrade={handlePaymentModalClose}
                 creditsRemaining={usageData?.creditsRemaining ?? 0}
                 creditLimit={usageData?.creditLimit ?? 0}
                 uploadCount={usageData?.uploadCount ?? 0}
