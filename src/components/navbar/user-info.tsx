@@ -55,6 +55,7 @@ export default function UserInfo() {
 
     return (
         <DropdownMenu
+            modal={false}
             onOpenChange={(open) => trackEvent("user_menu_toggled", { open })}
         >
             <DropdownMenuTrigger asChild>

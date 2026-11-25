@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAppRouter as useRouter } from "@/components/navigation-feedback";
 import { usePathname } from "next/navigation";
-import ModeToggle from "@/components/modeToggle/index";
 import UserInfo from "./user-info";
 import { BrandLogo } from "@/components/brand/logo";
 import { trackEvent, trackSignOut } from "@/lib/analytics";
@@ -57,6 +56,14 @@ export default function Navbar() {
 
     const handleNavClick = (sectionId: string) => {
         scrollToSection(sectionId);
+        setMenuState(false);
+    };
+
+    const handlePageNavClick = (destination: string) => {
+        trackEvent("navigation_selected", {
+            destination,
+            source: "navbar",
+        });
         setMenuState(false);
     };
 
@@ -102,7 +109,7 @@ export default function Navbar() {
                 )}
             >
                 <div className="mx-auto max-w-7xl px-6 lg:px-16  ">
-                    <div className="relative flex flex-wrap items-center justify-between gap-4 py-3 lg:py-4">
+                    <div className="relative flex items-center justify-between gap-4 py-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:py-4">
                         <div className="flex w-full items-center justify-between space-x-2 lg:w-auto">
                             <Link
                                 href="/"
@@ -116,7 +123,6 @@ export default function Navbar() {
                             </Link>
 
                             <div className="flex items-center gap-2 lg:hidden">
-                                <ModeToggle />
                                 <button
                                     onClick={() => {
                                         trackEvent("navigation_menu_toggled", {
@@ -142,36 +148,47 @@ export default function Navbar() {
                             </div>
                         </div>
 
-                        <div className="hidden lg:flex items-center gap-3">
-                            <div className="flex items-center gap-6">
-                                <button
-                                    onClick={() => scrollToSection("features")}
-                                    className="text-muted-foreground hover:text-accent-foreground  cursor-pointer  whitespace-nowrap"
+                        <div className="hidden items-center justify-center gap-6 lg:flex">
+                            <button
+                                onClick={() => scrollToSection("features")}
+                                className="inline-flex min-h-11 items-center rounded-sm whitespace-nowrap text-muted-foreground hover:text-accent-foreground cursor-pointer outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                            >
+                                Features
+                            </button>
+                            <button
+                                onClick={() => scrollToSection("pricing")}
+                                className="inline-flex min-h-11 items-center rounded-sm whitespace-nowrap text-muted-foreground hover:text-accent-foreground cursor-pointer outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                            >
+                                Pricing
+                            </button>
+                            <Link
+                                href="/terms"
+                                onClick={() => handlePageNavClick("/terms")}
+                                className="inline-flex min-h-11 items-center rounded-sm whitespace-nowrap text-muted-foreground hover:text-accent-foreground outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                            >
+                                Terms
+                            </Link>
+                            <Link
+                                href="/privacy"
+                                onClick={() => handlePageNavClick("/privacy")}
+                                className="inline-flex min-h-11 items-center rounded-sm whitespace-nowrap text-muted-foreground hover:text-accent-foreground outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                            >
+                                Privacy Policy
+                            </Link>
+                        </div>
+                        <div className="hidden items-center justify-end gap-3 lg:flex">
+                            {sessionStatus ===
+                            "loading" ? null : session?.user ? (
+                                <UserInfo />
+                            ) : (
+                                <Button
+                                    variant="default"
+                                    className="cursor-pointer px-4 shrink-0"
+                                    onClick={() => router.push("/signin")}
                                 >
-                                    Features
-                                </button>
-                                <button
-                                    onClick={() => scrollToSection("pricing")}
-                                    className="text-muted-foreground hover:text-accent-foreground  cursor-pointer  whitespace-nowrap"
-                                >
-                                    Pricing
-                                </button>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <ModeToggle />
-                                {sessionStatus ===
-                                "loading" ? null : session?.user ? (
-                                    <UserInfo />
-                                ) : (
-                                    <Button
-                                        variant="default"
-                                        className="cursor-pointer px-4 shrink-0"
-                                        onClick={() => router.push("/signin")}
-                                    >
-                                        Sign In
-                                    </Button>
-                                )}
-                            </div>
+                                    Sign In
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -186,7 +203,7 @@ export default function Navbar() {
                     >
                         <div className="absolute inset-0 bg-background" />
 
-                        <div className="relative flex h-full flex-col px-6 pt-4 pb-6">
+                        <div className="relative flex h-full flex-col overflow-y-auto px-6 pt-4 pb-6">
                             <div className="flex items-center justify-between pb-4">
                                 <Link
                                     href="/"
@@ -229,6 +246,24 @@ export default function Navbar() {
                                     >
                                         Pricing
                                     </button>
+                                    <Link
+                                        href="/terms"
+                                        onClick={() =>
+                                            handlePageNavClick("/terms")
+                                        }
+                                        className="block w-full rounded-xl px-1 py-2 text-left text-base font-medium text-foreground/90 hover:bg-muted/70"
+                                    >
+                                        Terms
+                                    </Link>
+                                    <Link
+                                        href="/privacy"
+                                        onClick={() =>
+                                            handlePageNavClick("/privacy")
+                                        }
+                                        className="block w-full rounded-xl px-1 py-2 text-left text-base font-medium text-foreground/90 hover:bg-muted/70"
+                                    >
+                                        Privacy Policy
+                                    </Link>
                                 </div>
 
                                 <div className="h-px w-full bg-border/70" />
