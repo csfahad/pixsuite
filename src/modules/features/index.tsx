@@ -1,314 +1,358 @@
 "use client";
-import { Crop, Expand, Scissors, Type, Zap } from "lucide-react";
-import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
+
+import { useState, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
+import {
+    ArrowRight,
+    Crop,
+    Expand,
+    Maximize2,
+    Scissors,
+    Type,
+} from "lucide-react";
+import Link from "@/components/navigation-link";
+import home from "@/modules/home/home.module.css";
+import styles from "./features.module.css";
 
-type FeaturesImageProps = {
-    title:
-        | "AI Background Removal"
-        | "AI Generative Fill"
-        | "AI Upscale & Enhance"
-        | "Smart Crop & Face Focus"
-        | "Watermark & Text Overlay";
-};
-
-const UpscaleSimulation = ({ title }: { title: string }) => {
-    const upscaleImg =
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=640&q=80";
-
+function Photo({
+    name,
+    alt,
+    className,
+    style,
+}: {
+    name: string;
+    alt: string;
+    className?: string;
+    style?: CSSProperties;
+}) {
     return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <div className="w-full h-full absolute inset-0 flex bg-neutral-900">
-                {/* Left Side: Blurry (Before) */}
-                <div className="w-1/2 h-full relative overflow-hidden z-10">
-                    <img
-                        src={upscaleImg}
-                        alt={title}
-                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center blur-sm scale-[1.12]"
-                    />
-                </div>
-
-                {/* Right Side: Enhanced (After) */}
-                <div className="w-1/2 h-full relative overflow-hidden">
-                    <img
-                        src={upscaleImg}
-                        alt={title}
-                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center -left-full"
-                    />
-                </div>
-            </div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none z-20" />
-        </div>
+        <Image
+            src={`/features/${name}.webp`}
+            alt={alt}
+            fill
+            unoptimized
+            sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
+            className={className}
+            style={style}
+        />
     );
-};
+}
 
-const WatermarkSimulation = ({ title }: { title: string }) => {
-    const watermarkImg =
-        "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=640&q=80";
+function Comparison({
+    original,
+    result,
+    alt,
+    label,
+    resultLabel,
+    transparent = false,
+}: {
+    original: string;
+    result: string;
+    alt: string;
+    label: string;
+    resultLabel: string;
+    transparent?: boolean;
+}) {
+    const [position, setPosition] = useState(46);
+    return (
+        <>
+            <div className={styles.comparisonCanvas}>
+                <Photo name={original} alt={`Original ${alt}`} />
+                <div
+                    className={`${styles.comparisonResult} ${transparent ? styles.checkerboard : ""}`}
+                    style={{ clipPath: `inset(0 0 0 ${position}%)` }}
+                >
+                    <Photo name={result} alt={`${resultLabel}: ${alt}`} />
+                </div>
+                <span
+                    className={styles.comparisonLine}
+                    style={{ left: `${position}%` }}
+                    aria-hidden
+                />
+            </div>
+            <div className={styles.comparisonControls}>
+                <span>Original</span>
+                <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={position}
+                    onChange={(event) =>
+                        setPosition(Number(event.target.value))
+                    }
+                    aria-label={label}
+                    aria-valuetext={`${position}% original, ${100 - position}% ${resultLabel.toLowerCase()}`}
+                />
+                <span>{resultLabel}</span>
+            </div>
+        </>
+    );
+}
+
+const cropModes = [
+    { name: "Smart crop", height: 0.78, x: 0.5, y: 0.41 },
+    { name: "Face crop", height: 0.39, x: 0.5, y: 0.28 },
+] as const;
+
+function CropPreview() {
+    const [selected, setSelected] = useState(0);
+    const mode = cropModes[selected] ?? cropModes[0];
+    const height = mode.height;
+    const width = height / (720 / 880);
+    const left = Math.max(0, Math.min(mode.x - width / 2, 1 - width));
+    const top = Math.max(0, Math.min(mode.y - height / 2, 1 - height));
 
     return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <div className="w-full h-full absolute inset-0 flex bg-neutral-900">
-                {/* Left Side: Original Image */}
-                <div className="w-1/2 h-full relative overflow-hidden border-r-2 border-primary z-10">
-                    <img
-                        src={watermarkImg}
-                        alt={title}
-                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center"
+        <>
+            <div className={styles.cropCanvas}>
+                <div className={styles.cropSource}>
+                    <Photo
+                        name="portrait-original"
+                        alt="Portrait with the selected crop outlined"
                     />
-                </div>
-
-                {/* Right Side: Watermarked Image */}
-                <div className="w-1/2 h-full relative overflow-hidden">
-                    <img
-                        src={watermarkImg}
-                        alt={title}
-                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center -left-full"
-                    />
-
-                    {/* High-end Watermark UI Overlay */}
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        {/* Subtle repeated pattern */}
-                        <div
-                            className="absolute inset-0 opacity-40 mix-blend-overlay"
-                            style={{
-                                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><text x='10' y='60' fill='white' font-family='sans-serif' font-size='14' font-weight='800' letter-spacing='2' transform='rotate(-30 60 60)'>CREATOR</text></svg>")`,
-                            }}
-                        ></div>
-
-                        {/* Bold central watermark */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-90 drop-shadow-2xl mix-blend-overlay">
-                            <div className="border-4 border-white text-white font-black tracking-[0.2em] text-2xl sm:text-3xl px-6 py-2 uppercase -rotate-12 backdrop-blur-sm bg-white/10">
-                                PROOF
-                            </div>
-                        </div>
+                    <div
+                        className={styles.cropSelection}
+                        style={{
+                            left: `${left * 100}%`,
+                            top: `${top * 100}%`,
+                            width: `${width * 100}%`,
+                            height: `${height * 100}%`,
+                        }}
+                        aria-hidden
+                    >
+                        <i />
+                        <i />
+                        <i />
+                        <i />
                     </div>
                 </div>
-            </div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none z-20" />
-        </div>
-    );
-};
-
-const BgRemovalSimulation = ({ title }: { title: string }) => {
-    const bgRemovalImg =
-        "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=640&q=80";
-
-    return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <div className="w-full h-full absolute inset-0 flex bg-white">
-                {/* Left Side: Original Image */}
-                <div className="w-1/2 h-full relative overflow-hidden border-r-2 border-primary z-10">
-                    <img
-                        src={bgRemovalImg}
-                        alt={title}
-                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center"
+                <ArrowRight
+                    size={14}
+                    className={styles.cropArrow}
+                    aria-hidden
+                />
+                <div className={styles.cropResult}>
+                    <Photo
+                        name="portrait-original"
+                        alt={`${mode.name} example of the same portrait`}
+                        style={{
+                            width: `${100 / width}%`,
+                            height: `${100 / height}%`,
+                            maxWidth: "none",
+                            left: `${(-left * 100) / width}%`,
+                            top: `${(-top * 100) / height}%`,
+                            right: "auto",
+                            bottom: "auto",
+                        }}
                     />
                 </div>
+            </div>
+            <div
+                className={styles.segmentedControls}
+                role="group"
+                aria-label="Choose a crop preview"
+            >
+                {cropModes.map((option, index) => (
+                    <button
+                        type="button"
+                        key={option.name}
+                        aria-pressed={selected === index}
+                        onClick={() => setSelected(index)}
+                    >
+                        {option.name}
+                    </button>
+                ))}
+            </div>
+        </>
+    );
+}
 
-                {/* Right Side: Simulated Background Removal via CSS mixed blending magic */}
+function FillPreview() {
+    const [expanded, setExpanded] = useState(true);
+    return (
+        <>
+            <div className={`${styles.fillCanvas} ${styles.checkerboard}`}>
                 <div
-                    className="w-1/2 h-full relative overflow-hidden bg-neutral-100"
-                    style={{
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23d4d4d8' d='M0 0h8v8H0zM8 8h8v8H8z'/%3E%3Cpath fill='%23e4e4e7' d='M8 0h8v8H8zM0 8h8v8H0z'/%3E%3C/svg%3E")`,
-                    }}
+                    className={styles.fillPhoto}
+                    style={{ clipPath: expanded ? undefined : "inset(8% 26%)" }}
                 >
-                    <img
-                        src={bgRemovalImg}
-                        alt={title}
-                        className="absolute inset-0 w-[200%] max-w-none h-full object-cover object-center -left-full mix-blend-multiply opacity-95 contrast-125"
+                    <Photo
+                        name="landscape-wide"
+                        alt="Mountain landscape used to illustrate an expanded canvas"
                     />
                 </div>
+                <div className={styles.startingCanvas} aria-hidden>
+                    <span>Starting canvas</span>
+                </div>
             </div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none z-20" />
-        </div>
+            <div
+                className={styles.segmentedControls}
+                role="group"
+                aria-label="Choose a generative fill preview"
+            >
+                <button
+                    type="button"
+                    aria-pressed={!expanded}
+                    onClick={() => setExpanded(false)}
+                >
+                    Original frame
+                </button>
+                <button
+                    type="button"
+                    aria-pressed={expanded}
+                    onClick={() => setExpanded(true)}
+                >
+                    Expanded canvas
+                </button>
+            </div>
+        </>
     );
-};
+}
 
-const CustomFeatureMedia = ({
-    src,
-    type,
+function PromptPreview() {
+    const [warm, setWarm] = useState(true);
+    return (
+        <>
+            <div className={styles.promptCanvas}>
+                <Photo
+                    name={warm ? "light-warm" : "light-original"}
+                    alt={`Deer in a meadow, ${warm ? "with a warmer light treatment" : "in the original photograph"}`}
+                />
+                <div className={styles.promptInstruction}>
+                    <Type size={14} aria-hidden />
+                    <span>Give the scene warmer evening light.</span>
+                </div>
+            </div>
+            <div
+                className={styles.segmentedControls}
+                role="group"
+                aria-label="Choose a prompt edit preview"
+            >
+                <button
+                    type="button"
+                    aria-pressed={!warm}
+                    onClick={() => setWarm(false)}
+                >
+                    Original photo
+                </button>
+                <button
+                    type="button"
+                    aria-pressed={warm}
+                    onClick={() => setWarm(true)}
+                >
+                    Prompt preview
+                </button>
+            </div>
+        </>
+    );
+}
+
+function Feature({
     title,
-    cropScale,
+    description,
+    icon,
+    children,
+    wide = false,
 }: {
-    src: string;
-    type: "video" | "image";
     title: string;
-    cropScale?: number;
-}) => {
+    description: string;
+    icon: ReactNode;
+    children: ReactNode;
+    wide?: boolean;
+}) {
     return (
-        <div className="group relative flex flex-col flex-1 w-full h-full min-h-[200px] rounded-xl overflow-hidden">
-            <div className="w-full h-full absolute inset-0 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800">
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    <img
-                        src={
-                            type === "video"
-                                ? src.replace(".webm", "-poster.webp")
-                                : src
-                        }
-                        alt={title}
-                        loading="lazy"
-                        className={`w-full h-full object-cover ${cropScale ? "origin-[center_60%]" : ""}`}
-                        style={
-                            cropScale
-                                ? { transform: `scale(${cropScale})` }
-                                : undefined
-                        }
-                    />
-                </div>
+        <article
+            className={`${styles.feature} ${wide ? styles.wideFeature : ""}`}
+        >
+            <div className={styles.featureCopy}>
+                <h3>{title}</h3>
+                <p>{description}</p>
             </div>
-            <div className="absolute inset-0 bg-linear-to-tr from-black/40 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none" />
-        </div>
-    );
-};
-
-const FeaturesImage = ({ title }: FeaturesImageProps) => {
-    if (title === "AI Background Removal") {
-        return <BgRemovalSimulation title={title} />;
-    }
-    if (title === "AI Upscale & Enhance") {
-        return <UpscaleSimulation title={title} />;
-    }
-    if (title === "Watermark & Text Overlay") {
-        return <WatermarkSimulation title={title} />;
-    }
-    if (title === "AI Generative Fill") {
-        return (
-            <CustomFeatureMedia
-                src="/features/gen-fill.webm"
-                type="video"
-                title={title}
-                cropScale={1.5}
-            />
-        );
-    }
-    if (title === "Smart Crop & Face Focus") {
-        return (
-            <CustomFeatureMedia
-                src="/features/smart-crop.webm"
-                type="video"
-                title={title}
-                cropScale={1.6}
-            />
-        );
-    }
-
-    const imageMap: Record<FeaturesImageProps["title"], string> = {
-        "AI Background Removal":
-            "https://images.unsplash.com/photo-1746050887217-8869b0145b9b?fit=crop&w=640&q=80",
-        "AI Generative Fill":
-            "https://plus.unsplash.com/premium_photo-1754489932772-c820e2055cb2?fit=crop&w=640&q=80",
-        "AI Upscale & Enhance":
-            "https://images.unsplash.com/photo-1755274556511-246bd7476606?fit=crop&w=640&q=80",
-        "Smart Crop & Face Focus":
-            "https://images.unsplash.com/photo-1584086938198-3e3d7a8253a0?fit=crop&w=640&q=80",
-        "Watermark & Text Overlay":
-            "https://images.unsplash.com/photo-1617050318658-a9a3175e34cb?fit=crop&w=640&q=80",
-    };
-
-    const imgSrc = imageMap[title];
-
-    return (
-        <div className="flex flex-col flex-1 w-full h-full min-h-24 rounded-xl bg-linear-to-br from-neutral-200 dark:from-neutral-900 dark:to-neutral-800 to-neutral-100 overflow-hidden group">
-            {imgSrc && (
-                <div className="w-full aspect-video rounded-xl overflow-hidden relative">
-                    <Image
-                        src={imgSrc}
-                        alt={title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        width={512}
-                        height={288}
-                        sizes="(max-width: 640px) 100vw, 100vw"
-                        priority={false}
-                        unoptimized={false}
-                    />
-                    <div className="absolute inset-0 bg-linear-to-tr from-black/40 via-transparent to-white/10 opacity-0 group-hover:opacity-100   pointer-events-none" />
+            <div className={styles.preview}>
+                <div className={styles.previewHeader}>
+                    <span>
+                        {icon} {title}
+                    </span>
+                    <span>Illustrative preview</span>
                 </div>
-            )}
-        </div>
+                {children}
+            </div>
+        </article>
     );
-};
-
-const features = [
-    {
-        icon: <Scissors className="h-6 w-6 text-neutral-500" />,
-        title: "AI Background Removal",
-        description:
-            "1-click clean photos with precision AI. Remove any background instantly and get professional results.",
-        header: <FeaturesImage title="AI Background Removal" />,
-        delay: 0.1,
-    },
-    {
-        icon: <Crop className="h-6 w-6 text-neutral-500" />,
-        title: "Smart Crop & Face Focus",
-        description:
-            "Perfect thumbnails automatically. AI detects faces and important content for optimal cropping.",
-        header: <FeaturesImage title="Smart Crop & Face Focus" />,
-        delay: 0.4,
-    },
-    {
-        icon: <Zap className="h-6 w-6 text-neutral-500" />,
-        title: "AI Upscale & Enhance",
-        description:
-            "Boost resolution up to 4x while fixing details. Transform low-res into stunning high-quality images.",
-        header: <FeaturesImage title="AI Upscale & Enhance" />,
-        delay: 0.3,
-    },
-    {
-        icon: <Expand className="h-6 w-6 text-neutral-500" />,
-        title: "AI Generative Fill",
-        description:
-            "Expand your canvas and auto-fill edges seamlessly. Create perfect aspect ratios effortlessly.",
-        header: <FeaturesImage title="AI Generative Fill" />,
-        delay: 0.2,
-    },
-
-    {
-        icon: <Type className="h-6 w-6 text-neutral-500" />,
-        title: "Watermark & Text Overlay",
-        description:
-            "Brand your content professionally. Add custom watermarks and text with perfect positioning.",
-        header: <FeaturesImage title="Watermark & Text Overlay" />,
-        delay: 0.5,
-    },
-];
+}
 
 export default function Features() {
     return (
-        <section id="features" className="pt-20 pb-10 relative overflow-hidden">
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
-
-            <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
-                <div className="text-center mb-16">
-                    <h2 className="text-4xl lg:text-6xl font-bold mb-6">
-                        <span className="text-foreground">Magical </span>
-                        <span className="bg-primary bg-clip-text! text-transparent">
-                            Features
-                        </span>
-                    </h2>
-
-                    <p className="text-base md:text-xl text-muted-foreground max-w-3xl mx-auto">
-                        Transform your photos with cutting-edge AI technology.
-                        Each feature is designed to give you professional
-                        results in seconds, not hours.
-                    </p>
+        <section
+            id="features"
+            className={`${home.featuresSection} ${styles.section}`}
+            aria-labelledby="features-heading"
+        >
+            <div className={home.container}>
+                <div className={styles.sectionHeader}>
+                    <div>
+                        <h2 id="features-heading">Choose what to change.</h2>
+                        <p>
+                            Five editing tools, each with a different job. Start
+                            with the part of your photo that needs attention.
+                        </p>
+                    </div>
+                    <Link href="/editor" className={styles.editorLink}>
+                        Open the editor <ArrowRight size={16} aria-hidden />
+                    </Link>
                 </div>
-
-                <BentoGrid className="max-w-6xl mx-auto text-lg ">
-                    {features.map((item, i) => (
-                        <BentoGridItem
-                            key={i}
-                            title={item.title}
-                            description={item.description}
-                            header={item.header}
-                            className={
-                                i === 3 || i === 6 ? "md:col-span-2" : ""
-                            }
+                <div className={styles.grid}>
+                    <Feature
+                        title="Background removal"
+                        description="Keep the subject. Remove the surroundings. Make a clean cutout for a product listing, a layout, or a new background."
+                        icon={<Scissors size={14} aria-hidden />}
+                    >
+                        <Comparison
+                            original="lamp-original"
+                            result="lamp-cutout"
+                            alt="a floor lamp"
+                            label="Compare the lamp photo with its transparent cutout"
+                            resultLabel="Cutout"
+                            transparent
                         />
-                    ))}
-                </BentoGrid>
+                    </Feature>
+                    <Feature
+                        title="Smart & face crop"
+                        description="Frame the main subject, or bring a face closer. Create a focused crop without finding the edges yourself."
+                        icon={<Crop size={14} aria-hidden />}
+                    >
+                        <CropPreview />
+                    </Feature>
+                    <Feature
+                        title="Upscale & retouch"
+                        description="Make room for more detail. Upscale to 2× for a larger image, or retouch the photo before you export."
+                        icon={<Maximize2 size={14} aria-hidden />}
+                    >
+                        <Comparison
+                            original="detail-small"
+                            result="detail-restored"
+                            alt="coffee cups viewed from above"
+                            label="Compare low resolution with the full-detail reference"
+                            resultLabel="Detail"
+                        />
+                    </Feature>
+                    <Feature
+                        title="Generative fill"
+                        description="Give the photo more room. Extend the scene beyond its original frame to fit a different composition."
+                        icon={<Expand size={14} aria-hidden />}
+                        wide
+                    >
+                        <FillPreview />
+                    </Feature>
+                    <Feature
+                        title="Prompt edits"
+                        description="Describe the change in your own words. Adjust the setting, light, or details while working from the photo you uploaded."
+                        icon={<Type size={14} aria-hidden />}
+                        wide
+                    >
+                        <PromptPreview />
+                    </Feature>
+                </div>
             </div>
         </section>
     );
