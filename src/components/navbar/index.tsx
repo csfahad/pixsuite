@@ -8,7 +8,6 @@ import {
     X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 import { signOut, useSession } from "next-auth/react";
 import Link from "@/components/navigation-link";
 import { useNavigationFeedback } from "@/components/navigation-feedback";
@@ -103,12 +102,9 @@ export default function Navbar() {
         <header>
             <nav
                 data-state={menuState && "active"}
-                className={cn(
-                    "fixed z-20 w-full  ",
-                    scrolled && "border-b bg-background/50 backdrop-blur-3xl",
-                )}
+                className="fixed z-20 w-full bg-background"
             >
-                <div className="mx-auto max-w-7xl px-6 lg:px-16  ">
+                <div className="mx-auto max-w-7xl px-6 lg:px-16">
                     <div className="relative flex items-center justify-between gap-4 py-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:py-4">
                         <div className="flex w-full items-center justify-between space-x-2 lg:w-auto">
                             <Link

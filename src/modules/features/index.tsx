@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import {
     ArrowRight,
@@ -18,12 +18,10 @@ function Photo({
     name,
     alt,
     className,
-    style,
 }: {
     name: string;
     alt: string;
     className?: string;
-    style?: CSSProperties;
 }) {
     return (
         <Image
@@ -33,7 +31,6 @@ function Photo({
             unoptimized
             sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
             className={className}
-            style={style}
         />
     );
 }
@@ -132,19 +129,20 @@ function CropPreview() {
                     aria-hidden
                 />
                 <div className={styles.cropResult}>
-                    <Photo
-                        name="portrait-original"
-                        alt={`${mode.name} example of the same portrait`}
+                    <div
+                        className={styles.cropResultImage}
                         style={{
                             width: `${100 / width}%`,
                             height: `${100 / height}%`,
-                            maxWidth: "none",
                             left: `${(-left * 100) / width}%`,
                             top: `${(-top * 100) / height}%`,
-                            right: "auto",
-                            bottom: "auto",
                         }}
-                    />
+                    >
+                        <Photo
+                            name="portrait-original"
+                            alt={`${mode.name} example of the same portrait`}
+                        />
+                    </div>
                 </div>
             </div>
             <div

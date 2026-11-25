@@ -180,6 +180,9 @@
 .cropResult {
     aspect-ratio: 1;
 }
+.cropResultImage {
+    position: absolute;
+}
 .cropArrow {
     color: var(--home-muted);
 }
