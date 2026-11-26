@@ -1,55 +1,51 @@
 "use client";
-import { BrandMark } from "@/components/brand/logo";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import {
+    Suspense,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type FormEvent,
+    type ReactNode,
+} from "react";
 import { useSession } from "next-auth/react";
-import { useAppRouter as useRouter } from "@/components/navigation-feedback";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import {
+    ArrowRight,
+    CalendarDays,
+    CircleAlert,
+    CircleCheck,
+    Clock3,
+    CreditCard,
+    ImagePlus,
+    Mail,
+    Pencil,
+    UserRound,
+    Zap,
+} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { PageLoading } from "@/components/loading-state";
+import { useAppRouter } from "@/components/navigation-feedback";
 import {
     setAnalyticsPlan,
     trackEvent,
     updateAnalyticsProfile,
 } from "@/lib/analytics";
-import {
-    User,
-    CreditCard,
-    Mail,
-    Calendar,
-    Clock,
-    Sparkles,
-    Zap,
-    Crown,
-    Star,
-    ArrowUpRight,
-    Check,
-    Pencil,
-    X,
-    ChevronRight,
-    DollarSign,
-    CalendarCheck,
-} from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { PageLoading, LoadingState } from "@/components/loading-state";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { isPaidPlan, PLAN_PRICES_PAISE, type PlanType } from "@/lib/plans";
+import home from "@/modules/home/home.module.css";
+import styles from "./account.module.css";
 
 type UserData = {
     id: string;
     name: string;
     email: string;
     avatar: string | null;
-    plan: "Free" | "Starter" | "Lite" | "Pro";
+    plan: PlanType;
     creditsUsed: number;
     creditLimit: number;
     uploadCount: number;
@@ -59,1031 +55,605 @@ type UserData = {
     updatedAt: string;
 };
 
-type Tab = "account" | "plan";
-
-const tabs: { id: Tab; label: string; icon: typeof User }[] = [
-    { id: "account", label: "Account", icon: User },
-    { id: "plan", label: "Plan & Billing", icon: CreditCard },
-];
-
-const planConfig: Record<
-    string,
+const sections = [
+    { id: "account", label: "Profile", href: "/account", Icon: UserRound },
     {
-        icon: typeof Star;
-        color: string;
-        bg: string;
-        border: string;
-        label: string;
-        description: string;
-        price: string;
-        period: string;
-    }
-> = {
-    Free: {
-        icon: Star,
-        color: "text-muted-foreground",
-        bg: "bg-muted",
-        border: "border-border",
-        label: "Free Plan",
-        description: "3 uploads/month, no AI credits",
-        price: "₹0",
-        period: "/forever",
+        id: "plan",
+        label: "Plan & Billing",
+        href: "/account?tab=plan",
+        Icon: CreditCard,
     },
-    Starter: {
-        icon: Zap,
-        color: "text-emerald-500",
-        bg: "bg-emerald-500/10",
-        border: "border-emerald-500/30",
-        label: "Starter Plan",
-        description: "500 uploads/mo, 3,000 AI credits",
-        price: "₹999",
-        period: "/month",
-    },
-    Lite: {
-        icon: Zap,
-        color: "text-blue-500",
-        bg: "bg-blue-500/10",
-        border: "border-blue-500/30",
-        label: "Lite Plan",
-        description: "5,000 uploads/mo, 10,000 AI credits",
-        price: "₹2,699",
-        period: "/month",
-    },
-    Pro: {
-        icon: Crown,
-        color: "text-amber-500",
-        bg: "bg-amber-500/10",
-        border: "border-amber-500/30",
-        label: "Pro Plan",
-        description: "20,000 uploads/mo, 25,000 AI credits",
-        price: "₹5,499",
-        period: "/month",
-    },
-};
+] as const;
+
+const numberFormat = new Intl.NumberFormat("en-IN");
+const priceFormat = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+});
+const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "long" });
+
+function AccountDate({ value }: { value: string }) {
+    return <time dateTime={value}>{dateFormat.format(new Date(value))}</time>;
+}
 
 export default function AccountPage() {
     return (
         <Suspense fallback={<PageLoading label="Loading account…" />}>
-            <AccountPageContent />
+            <AccountSettings />
         </Suspense>
     );
 }
 
-function AccountPageContent() {
-    const { data: session, status: sessionStatus } = useSession();
-    const router = useRouter();
-    const searchParams = useSearchParams();
-
-    const [activeTab, setActiveTab] = useState<Tab>(
-        (searchParams.get("tab") as Tab) || "account",
-    );
-    const [userData, setUserData] = useState<UserData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [editingName, setEditingName] = useState(false);
-    const [newName, setNewName] = useState("");
-    const [saving, setSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
-    const [saveError, setSaveError] = useState<string | null>(null);
+function AccountSettings() {
+    const { data: session, status } = useSession();
+    const router = useAppRouter();
+    const active =
+        useSearchParams().get("tab") === "plan" ? sections[1] : sections[0];
+    const [account, setAccount] = useState<UserData | null>(null);
+    const [loadError, setLoadError] = useState(false);
+    const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
-        if (sessionStatus === "unauthenticated") {
+        if (status === "unauthenticated") {
             router.replace("/");
+            return;
         }
-    }, [sessionStatus, router]);
+        if (status !== "authenticated") return;
 
-    const fetchUserData = useCallback(async () => {
-        try {
-            setLoading(true);
-            setLoadError(null);
-            const res = await fetch("/api/account");
-            if (res.status === 401) {
-                router.replace("/");
-                return;
-            }
-            if (res.ok) {
-                const data = await res.json();
-                setUserData(data);
+        const controller = new AbortController();
+        const load = async () => {
+            try {
+                const response = await fetch("/api/account", {
+                    signal: controller.signal,
+                });
+                if (controller.signal.aborted) return;
+                if (response.status === 401) {
+                    router.replace("/");
+                    return;
+                }
+                if (!response.ok) {
+                    trackEvent("account_load_failed", {
+                        status_code: response.status,
+                    });
+                    setLoadError(true);
+                    return;
+                }
+                const data: UserData = await response.json();
+                if (controller.signal.aborted) return;
+                setAccount(data);
                 setAnalyticsPlan(data.plan);
                 updateAnalyticsProfile(data);
                 trackEvent("account_loaded", { profile: data });
-                setNewName(data.name);
-            } else {
-                trackEvent("account_load_failed", { status_code: res.status });
-                setLoadError("Your account couldn’t load. Try again.");
+            } catch (error) {
+                if (controller.signal.aborted) return;
+                trackEvent("account_load_failed", {
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                });
+                setLoadError(true);
             }
-        } catch (err) {
-            trackEvent("account_load_failed", {
-                error: err instanceof Error ? err.message : String(err),
-            });
-            console.error("Failed to fetch account data:", err);
-            setLoadError("Your account couldn’t load. Try again.");
-        } finally {
-            setLoading(false);
-        }
-    }, [router]);
+        };
+        void load();
+        return () => controller.abort();
+    }, [attempt, router, status]);
 
-    useEffect(() => {
-        if (sessionStatus === "authenticated") {
-            fetchUserData();
-        }
-    }, [sessionStatus, fetchUserData]);
+    if (status === "unauthenticated") {
+        return <PageLoading label="Opening PixSuite…" />;
+    }
 
-    useEffect(() => {
-        const tabParam = searchParams.get("tab") as Tab;
-        if (tabParam && (tabParam === "account" || tabParam === "plan")) {
-            setActiveTab(tabParam);
-        }
-    }, [searchParams]);
+    return (
+        <main className={`${home.surface} ${styles.page}`}>
+            <div className={styles.container}>
+                <header className={styles.pageHeader}>
+                    <h1>Account settings</h1>
+                </header>
+                <div className={styles.layout}>
+                    <nav
+                        className={styles.navigation}
+                        aria-label="Account settings"
+                    >
+                        {sections.map(({ id, label, href, Icon }) => (
+                            <Link
+                                key={id}
+                                href={href}
+                                scroll={false}
+                                aria-current={
+                                    active.id === id ? "page" : undefined
+                                }
+                                className={styles.navLink}
+                                onClick={() =>
+                                    trackEvent("account_tab_selected", {
+                                        tab: id,
+                                    })
+                                }
+                            >
+                                <Icon size={16} aria-hidden />
+                                {label}
+                            </Link>
+                        ))}
+                    </nav>
 
-    const handleTabChange = (tab: Tab) => {
-        trackEvent("account_tab_selected", { tab });
-        setActiveTab(tab);
-        const url = new URL(window.location.href);
-        url.searchParams.set("tab", tab);
-        window.history.replaceState({}, "", url.toString());
+                    <section
+                        className={styles.content}
+                        aria-labelledby="account-view-title"
+                    >
+                        <h2 id="account-view-title">{active.label}</h2>
+                        {loadError ? (
+                            <div
+                                className={`${styles.panel} ${styles.feedback}`}
+                            >
+                                <p className={styles.loadError} role="alert">
+                                    <CircleAlert size={16} aria-hidden />
+                                    Your account couldn’t load.
+                                </p>
+                                <Button
+                                    className={styles.button}
+                                    onClick={() => {
+                                        setLoadError(false);
+                                        setAttempt((value) => value + 1);
+                                    }}
+                                >
+                                    Try again
+                                </Button>
+                            </div>
+                        ) : !account || status !== "authenticated" ? (
+                            <div
+                                className={`${styles.panel} ${styles.skeleton}`}
+                                role="status"
+                            >
+                                <p className="sr-only">Loading your account…</p>
+                                <span aria-hidden />
+                                <span aria-hidden />
+                                <span aria-hidden />
+                            </div>
+                        ) : active.id === "account" ? (
+                            <Profile
+                                account={account}
+                                onSaved={(updated) =>
+                                    setAccount(
+                                        (current) =>
+                                            current && {
+                                                ...current,
+                                                name: updated.name,
+                                                updatedAt: updated.updatedAt,
+                                            },
+                                    )
+                                }
+                                image={
+                                    session?.user?.image ||
+                                    session?.user?.avatar ||
+                                    account.avatar ||
+                                    undefined
+                                }
+                            />
+                        ) : (
+                            <Billing account={account} />
+                        )}
+                    </section>
+                </div>
+            </div>
+        </main>
+    );
+}
+
+function Profile({
+    account,
+    image,
+    onSaved,
+}: {
+    account: UserData;
+    image?: string;
+    onSaved: (account: UserData) => void;
+}) {
+    const [draft, setDraft] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const restoreEditFocus = useRef(false);
+    const editButton = useCallback((button: HTMLButtonElement | null) => {
+        if (button && restoreEditFocus.current) {
+            restoreEditFocus.current = false;
+            button.focus({ preventScroll: true });
+        }
+    }, []);
+
+    const name = account.name.trim();
+    const words = name.split(/\s+/);
+    const initials =
+        words.length > 1
+            ? words
+                  .slice(0, 2)
+                  .map((word) => Array.from(word)[0])
+                  .join("")
+            : Array.from(name || account.email)
+                  .slice(0, 2)
+                  .join("");
+
+    const closeEditor = () => {
+        restoreEditFocus.current = true;
+        setDraft(null);
+        setError(null);
     };
 
-    const handleSaveName = async () => {
-        if (!newName.trim() || newName.trim() === userData?.name) {
-            setEditingName(false);
+    const cancelEdit = () => {
+        if (saving) return;
+        trackEvent("account_profile_edit_cancelled", {
+            field: "name",
+            name: draft,
+        });
+        closeEditor();
+    };
+
+    const saveName = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (saving || draft === null) return;
+        const nextName = draft.trim();
+        if (!nextName) {
+            setError("Enter your full name.");
+            return;
+        }
+        if (nextName === name) {
+            closeEditor();
             return;
         }
 
         setSaving(true);
-        setSaveError(null);
+        setError(null);
         try {
-            const res = await fetch("/api/account", {
+            const response = await fetch("/api/account", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: newName.trim() }),
+                body: JSON.stringify({ name: nextName }),
             });
-
-            if (res.ok) {
-                const updated = await res.json();
-                setUserData(updated);
-                setEditingName(false);
-                setSaveSuccess(true);
-                updateAnalyticsProfile(updated);
-                trackEvent("account_profile_updated", {
-                    field: "name",
-                    previous_name: userData?.name,
-                    name: updated.name,
-                    profile: updated,
-                });
-                setTimeout(() => setSaveSuccess(false), 2500);
-            } else {
-                const err = await res.json();
+            if (!response.ok) {
+                const body = await response.json().catch(() => null);
                 trackEvent("account_profile_update_failed", {
                     field: "name",
-                    name: newName.trim(),
-                    status_code: res.status,
-                    error: err.error,
+                    status_code: response.status,
+                    error: body?.error,
                 });
-                setSaveError(err.error || "Failed to update name");
+                setError(
+                    response.status === 400 && typeof body?.error === "string"
+                        ? body.error
+                        : "Your name couldn’t be saved. Try again.",
+                );
+                return;
             }
-        } catch (err) {
+            const updated: UserData = await response.json();
+            onSaved(updated);
+            updateAnalyticsProfile(updated);
+            trackEvent("account_profile_updated", {
+                field: "name",
+                previous_name: account.name,
+                name: updated.name,
+                profile: updated,
+            });
+            setSaved(true);
+            closeEditor();
+        } catch (error) {
             trackEvent("account_profile_update_failed", {
                 field: "name",
-                name: newName.trim(),
-                error: err instanceof Error ? err.message : String(err),
+                error: error instanceof Error ? error.message : String(error),
             });
-            setSaveError("Something went wrong");
+            setError("Your name couldn’t be saved. Try again.");
         } finally {
             setSaving(false);
         }
     };
 
-    const getInitials = (name: string | null | undefined) => {
-        if (!name) return "U";
-        const names = name.split(" ");
-        return names.length >= 2
-            ? `${names[0][0]}${names[1][0]}`.toUpperCase()
-            : name.substring(0, 2).toUpperCase();
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        });
-    };
-
-    const formatRelativeDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 0) return "Today";
-        if (diffDays === 1) return "Yesterday";
-        if (diffDays < 7) return `${diffDays} days ago`;
-        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-        if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-        return `${Math.floor(diffDays / 365)} years ago`;
-    };
-
-    const creditPercentage =
-        userData && userData.creditLimit > 0
-            ? Math.min((userData.creditsUsed / userData.creditLimit) * 100, 100)
-            : 0;
-
-    const uploadPercentage = userData
-        ? Math.min((userData.uploadCount / userData.uploadLimit) * 100, 100)
-        : 0;
-
-    const creditsRemaining = userData
-        ? Math.max(userData.creditLimit - userData.creditsUsed, 0)
-        : 0;
-
-    const uploadsRemaining = userData
-        ? Math.max(userData.uploadLimit - userData.uploadCount, 0)
-        : 0;
-
-    const isSubscriptionActive = userData?.subscriptionExpiresAt
-        ? new Date(userData.subscriptionExpiresAt) > new Date()
-        : false;
-
-    if (sessionStatus === "loading" || sessionStatus === "unauthenticated") {
-        return (
-            <PageLoading
-                label={
-                    sessionStatus === "loading"
-                        ? "Checking your session…"
-                        : "Opening PixSuite…"
-                }
-            />
-        );
-    }
-
     return (
-        <TooltipProvider>
-            {saving && <LoadingState label="Saving your account…" />}
-            <div className="min-h-screen bg-background pt-28 pb-12">
-                {/* Page header */}
-                <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">
-                            Account Settings
-                        </h1>
-                        <p className="text-muted-foreground mt-1">
-                            Manage your account settings and billing preferences
-                        </p>
-                    </div>
-                </div>
-
-                <div className="w-full max-w-7xl mx-auto px-6 lg:px-16">
-                    <div className="flex flex-col md:flex-row gap-8">
-                        {/* Sidebar */}
-                        <aside className="md:w-[220px] shrink-0">
-                            {/* Mobile: horizontal tabs */}
-                            <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-                                {tabs.map((tab) => {
-                                    const isActive = activeTab === tab.id;
-                                    return (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() =>
-                                                handleTabChange(tab.id)
-                                            }
-                                            className={`relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium   whitespace-nowrap cursor-pointer
-                                                ${
-                                                    isActive
-                                                        ? "text-foreground"
-                                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                                }`}
-                                        >
-                                            {isActive && (
-                                                <div className="absolute inset-0 bg-muted rounded-lg" />
-                                            )}
-                                            <span className="relative z-10 flex items-center gap-3">
-                                                <tab.icon className="h-4 w-4" />
-                                                {tab.label}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </nav>
-                        </aside>
-
-                        {/* Content */}
-                        <main className="flex-1 min-w-0">
-                            <>
-                                {loading ? (
-                                    <div key="loading" className="space-y-6">
-                                        <LoadingState
-                                            label="Loading your account…"
-                                            className="justify-start"
-                                        />
-                                        {/* Skeleton */}
-                                        {[1, 2, 3].map((i) => (
-                                            <div
-                                                key={i}
-                                                className="h-32 rounded-xl bg-muted/50 "
-                                            />
-                                        ))}
-                                    </div>
-                                ) : loadError ? (
-                                    <div role="alert" className="space-y-4">
-                                        <p className="text-sm text-destructive">
-                                            {loadError}
-                                        </p>
-                                        <Button onClick={fetchUserData}>
-                                            Try again
-                                        </Button>
-                                    </div>
-                                ) : activeTab === "account" ? (
-                                    <AccountTab
-                                        key="account"
-                                        userData={userData}
-                                        editingName={editingName}
-                                        setEditingName={(editing) => {
-                                            trackEvent(
-                                                editing
-                                                    ? "account_profile_edit_started"
-                                                    : "account_profile_edit_cancelled",
-                                                {
-                                                    field: "name",
-                                                    name: newName,
-                                                },
-                                            );
-                                            setEditingName(editing);
-                                        }}
-                                        newName={newName}
-                                        setNewName={setNewName}
-                                        saving={saving}
-                                        saveSuccess={saveSuccess}
-                                        saveError={saveError}
-                                        setSaveError={setSaveError}
-                                        handleSaveName={handleSaveName}
-                                        getInitials={getInitials}
-                                        formatDate={formatDate}
-                                        formatRelativeDate={formatRelativeDate}
-                                        profileImage={
-                                            session?.user?.image ||
-                                            session?.user?.avatar ||
-                                            ""
-                                        }
-                                    />
-                                ) : (
-                                    <PlanTab
-                                        key="plan"
-                                        userData={userData}
-                                        creditPercentage={creditPercentage}
-                                        uploadPercentage={uploadPercentage}
-                                        creditsRemaining={creditsRemaining}
-                                        uploadsRemaining={uploadsRemaining}
-                                        isSubscriptionActive={
-                                            isSubscriptionActive
-                                        }
-                                        formatDate={formatDate}
-                                    />
-                                )}
-                            </>
-                        </main>
-                    </div>
-                </div>
-            </div>
-        </TooltipProvider>
-    );
-}
-
-function AccountTab({
-    userData,
-    editingName,
-    setEditingName,
-    newName,
-    setNewName,
-    saving,
-    saveSuccess,
-    saveError,
-    setSaveError,
-    handleSaveName,
-    getInitials,
-    formatDate,
-    formatRelativeDate,
-    profileImage,
-}: {
-    userData: UserData | null;
-    editingName: boolean;
-    setEditingName: (v: boolean) => void;
-    newName: string;
-    setNewName: (v: string) => void;
-    saving: boolean;
-    saveSuccess: boolean;
-    saveError: string | null;
-    setSaveError: (v: string | null) => void;
-    handleSaveName: () => Promise<void>;
-    getInitials: (name: string | null | undefined) => string;
-    formatDate: (d: string) => string;
-    formatRelativeDate: (d: string) => string;
-    profileImage: string;
-}) {
-    if (!userData) return null;
-
-    return (
-        <div className="space-y-6">
-            {/* Profile header card */}
-            <Card className="border-border/50 overflow-hidden">
-                <div className="h-24 bg-linear-to-br from-primary/10 via-primary/5 to-transparent" />
-                <CardContent className="relative pt-0 -mt-12 px-6 pb-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-                        <div>
-                            <Avatar className="h-20 w-20 border-4 border-background shadow-lg">
-                                <AvatarImage
-                                    src={profileImage}
-                                    alt={userData.name}
-                                    referrerPolicy="no-referrer"
-                                />
-                                <AvatarFallback className="text-xl font-semibold bg-primary/10 text-primary">
-                                    {getInitials(userData.name)}
-                                </AvatarFallback>
-                            </Avatar>
-                        </div>
-                        <div className="flex-1 pt-2 sm:pt-0 sm:pb-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-xl font-semibold text-foreground">
-                                    {userData.name}
-                                </h2>
-                                {userData.plan !== "Free" && (
-                                    <Badge
-                                        variant="outline"
-                                        className={`text-xs ${planConfig[userData.plan].color} ${planConfig[userData.plan].border}`}
-                                    >
-                                        {userData.plan}
-                                    </Badge>
-                                )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                                {userData.email}
+        <div className={styles.panel}>
+            <p className="sr-only" role="status">
+                {saved ? "Name updated." : ""}
+            </p>
+            <div
+                className={styles.identity}
+                data-editing={draft !== null || undefined}
+            >
+                <Avatar className={styles.avatar} aria-hidden="true">
+                    <AvatarImage
+                        src={image}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                    />
+                    <AvatarFallback>
+                        {initials.toUpperCase() || "U"}
+                    </AvatarFallback>
+                </Avatar>
+                {draft !== null ? (
+                    <form
+                        className={styles.nameForm}
+                        onSubmit={saveName}
+                        onKeyDown={(event) => {
+                            if (event.key === "Escape") cancelEdit();
+                        }}
+                    >
+                        <label
+                            htmlFor="account-name"
+                            className={styles.fieldLabel}
+                        >
+                            Full name
+                        </label>
+                        <Input
+                            id="account-name"
+                            autoComplete="name"
+                            maxLength={100}
+                            value={draft}
+                            readOnly={saving}
+                            aria-invalid={!!error}
+                            aria-describedby={
+                                error ? "account-name-error" : undefined
+                            }
+                            onChange={(event) => {
+                                setDraft(event.target.value);
+                                setError(null);
+                            }}
+                            autoFocus
+                        />
+                        {error && (
+                            <p
+                                id="account-name-error"
+                                className={styles.formError}
+                                role="alert"
+                            >
+                                {error}
                             </p>
+                        )}
+                        <div className={styles.formActions}>
+                            <Button
+                                type="submit"
+                                className={styles.button}
+                                disabled={saving}
+                                aria-busy={saving}
+                            >
+                                {saving ? "Saving…" : "Save name"}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className={styles.button}
+                                disabled={saving}
+                                onClick={cancelEdit}
+                            >
+                                Cancel
+                            </Button>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Personal information */}
-            <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">
-                    Personal Information
-                </h3>
-
-                <Card className="border-border/50">
-                    <CardContent className="p-0 divide-y divide-border/50">
-                        {/* Name (editable) */}
-                        <div className="flex items-center justify-between px-6 py-4">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                    <User className="h-4 w-4 text-primary" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        Full Name
-                                    </Label>
-                                    {editingName ? (
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <Input
-                                                value={newName}
-                                                onChange={(e) => {
-                                                    setNewName(e.target.value);
-                                                    setSaveError(null);
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter")
-                                                        handleSaveName();
-                                                    if (e.key === "Escape") {
-                                                        setEditingName(false);
-                                                        setNewName(
-                                                            userData.name,
-                                                        );
-                                                    }
-                                                }}
-                                                className="h-8 text-sm max-w-[240px]"
-                                                autoFocus
-                                                disabled={saving}
-                                                aria-busy={saving}
-                                            />
-                                            <Button
-                                                size="sm"
-                                                onClick={handleSaveName}
-                                                disabled={saving}
-                                                aria-busy={saving}
-                                                className="h-8 px-3 cursor-pointer"
-                                            >
-                                                {saving ? (
-                                                    <BrandMark className="h-3 w-3 " />
-                                                ) : (
-                                                    <Check className="h-3 w-3" />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    setEditingName(false);
-                                                    setNewName(userData.name);
-                                                    setSaveError(null);
-                                                }}
-                                                className="h-8 px-2 cursor-pointer"
-                                                disabled={saving}
-                                                aria-busy={saving}
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm font-medium text-foreground truncate">
-                                            {userData.name}
-                                        </p>
-                                    )}
-                                    <>
-                                        {saveError && (
-                                            <p className="text-xs text-destructive mt-1">
-                                                {saveError}
-                                            </p>
-                                        )}
-                                        {saveSuccess && (
-                                            <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1">
-                                                <Check className="h-3 w-3" />
-                                                Name updated successfully
-                                            </p>
-                                        )}
-                                    </>
-                                </div>
-                            </div>
-                            {!editingName && (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            onClick={() => setEditingName(true)}
-                                            className="shrink-0 cursor-pointer"
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Edit name</TooltipContent>
-                                </Tooltip>
+                    </form>
+                ) : (
+                    <>
+                        <div>
+                            <h3 className={styles.displayName}>
+                                {name || "Your account"}
+                            </h3>
+                            {isPaidPlan(account.plan) && (
+                                <p className={styles.identityPlan}>
+                                    {account.plan} plan
+                                </p>
+                            )}
+                            {saved && (
+                                <p
+                                    className={styles.statusMessage}
+                                    aria-hidden="true"
+                                >
+                                    Name updated.
+                                </p>
                             )}
                         </div>
+                        <Button
+                            ref={editButton}
+                            type="button"
+                            variant="outline"
+                            className={`${styles.button} ${styles.quietButton}`}
+                            onClick={() => {
+                                setSaved(false);
+                                setDraft(account.name);
+                                trackEvent("account_profile_edit_started", {
+                                    field: "name",
+                                    name: account.name,
+                                });
+                            }}
+                        >
+                            <Pencil size={15} aria-hidden />
+                            Edit name
+                        </Button>
+                    </>
+                )}
+            </div>
 
-                        {/* Email */}
-                        <div className="flex items-center px-6 py-4">
-                            <div className="flex items-center gap-3 flex-1">
-                                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                    <Mail className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        Email Address
-                                    </Label>
-                                    <p className="text-sm font-medium text-foreground">
-                                        {userData.email}
-                                    </p>
-                                </div>
-                            </div>
-                            <Badge
-                                variant="secondary"
-                                className="text-[10px] shrink-0"
-                            >
-                                Verified
-                            </Badge>
-                        </div>
+            <div className={styles.emailRow}>
+                <ProfileDetail label="Email address" Icon={Mail}>
+                    {account.email}
+                </ProfileDetail>
+                <span className={styles.verified}>
+                    <CircleCheck size={14} aria-hidden />
+                    Verified
+                </span>
+            </div>
 
-                        <Separator className="opacity-0" />
-
-                        {/* Member since */}
-                        <div className="flex items-center px-6 py-4">
-                            <div className="flex items-center gap-3 flex-1">
-                                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                    <Calendar className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        Member Since
-                                    </Label>
-                                    <p className="text-sm font-medium text-foreground">
-                                        {formatDate(userData.createdAt)}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Last updated */}
-                        <div className="flex items-center px-6 py-4">
-                            <div className="flex items-center gap-3 flex-1">
-                                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                    <Clock className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        Last Updated
-                                    </Label>
-                                    <p className="text-sm font-medium text-foreground">
-                                        {formatRelativeDate(userData.updatedAt)}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className={styles.metadata}>
+                <ProfileDetail label="Member since" Icon={CalendarDays}>
+                    <AccountDate value={account.createdAt} />
+                </ProfileDetail>
+                <ProfileDetail label="Last updated" Icon={Clock3}>
+                    <AccountDate value={account.updatedAt} />
+                </ProfileDetail>
             </div>
         </div>
     );
 }
 
-function PlanTab({
-    userData,
-    creditPercentage,
-    uploadPercentage,
-    creditsRemaining,
-    uploadsRemaining,
-    isSubscriptionActive,
-    formatDate,
+function ProfileDetail({
+    label,
+    Icon,
+    children,
 }: {
-    userData: UserData | null;
-    creditPercentage: number;
-    uploadPercentage: number;
-    creditsRemaining: number;
-    uploadsRemaining: number;
-    isSubscriptionActive: boolean;
-    formatDate: (d: string) => string;
+    label: string;
+    Icon: typeof Mail;
+    children: ReactNode;
 }) {
-    if (!userData) return null;
+    return (
+        <div className={styles.labeledValue}>
+            <Icon size={16} aria-hidden />
+            <dl>
+                <dt className={styles.fieldLabel}>{label}</dt>
+                <dd className={styles.fieldValue}>{children}</dd>
+            </dl>
+        </div>
+    );
+}
 
-    const plan = planConfig[userData.plan];
-    const PlanIcon = plan.icon;
+function Billing({ account }: { account: UserData }) {
+    const [openedAt] = useState(Date.now);
+    const plan = account.plan;
+    const paid = isPaidPlan(plan);
+    const expiry = paid ? account.subscriptionExpiresAt : null;
+    const active = paid && !!expiry && Date.parse(expiry) > openedAt;
+    const inactive = paid && !active;
+    const price = paid ? PLAN_PRICES_PAISE[plan] / 100 : 0;
 
     return (
-        <div className="space-y-6">
-            {/* Current plan card */}
-            <Card className={`border-border/50 overflow-hidden`}>
-                <div
-                    className={`h-2 ${
-                        userData.plan === "Pro"
-                            ? "bg-linear-to-r from-amber-500 to-orange-500"
-                            : userData.plan === "Lite"
-                              ? "bg-linear-to-r from-blue-500 to-cyan-500"
-                              : userData.plan === "Starter"
-                                ? "bg-linear-to-r from-emerald-500 to-teal-500"
-                                : "bg-linear-to-r from-muted-foreground/30 to-muted-foreground/10"
-                    }`}
-                />
-                <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-4">
-                            <div
-                                className={`h-14 w-14 rounded-xl ${plan.bg} flex items-center justify-center`}
-                            >
-                                <PlanIcon className={`h-7 w-7 ${plan.color}`} />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-semibold text-foreground">
-                                        {plan.label}
-                                    </h3>
-                                    {isSubscriptionActive && (
-                                        <Badge
-                                            variant="outline"
-                                            className="text-[10px] text-emerald-500 border-emerald-500/30"
-                                        >
-                                            Active
-                                        </Badge>
-                                    )}
-                                </div>
-                                <p className="text-sm text-muted-foreground mt-0.5">
-                                    {plan.description}
-                                </p>
-                            </div>
-                        </div>
-                        {userData.plan !== "Pro" && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="shrink-0 cursor-pointer gap-1"
-                                onClick={() => {
-                                    const el =
-                                        document.getElementById("pricing");
-                                    if (el) {
-                                        el.scrollIntoView({
-                                            behavior: "instant",
-                                        });
-                                    } else {
-                                        window.location.href = "/#pricing";
-                                    }
-                                }}
-                            >
-                                Upgrade
-                                <ArrowUpRight className="h-3 w-3" />
-                            </Button>
-                        )}
-                    </div>
-
-                    {/* Plan details */}
-                    <Separator className="my-5" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Plan price */}
-                        <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                <DollarSign className="h-4 w-4 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                    Plan Amount
-                                </p>
-                                <p className="text-sm font-semibold text-foreground">
-                                    {plan.price}
-                                    <span className="text-xs font-normal text-muted-foreground">
-                                        {plan.period}
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Subscribed date */}
-                        {userData.subscriptionExpiresAt && (
-                            <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                    <CalendarCheck className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        Subscribed On
-                                    </p>
-                                    <p className="text-sm font-semibold text-foreground">
-                                        {formatDate(userData.createdAt)}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Renewal / expiry */}
-                        {userData.subscriptionExpiresAt && (
-                            <div className="flex items-center gap-3">
-                                <div
-                                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                        isSubscriptionActive
-                                            ? "bg-emerald-500/10"
-                                            : "bg-destructive/10"
-                                    }`}
+        <>
+            <section
+                className={`${styles.panel} ${styles.planSummary}`}
+                aria-label="Current plan"
+            >
+                <div className={styles.planMain}>
+                    <div>
+                        <div className={styles.planName}>
+                            <h3>{plan} plan</h3>
+                            {paid && (
+                                <span
+                                    className={styles.planStatus}
+                                    data-inactive={inactive || undefined}
                                 >
-                                    <Calendar
-                                        className={`h-4 w-4 ${
-                                            isSubscriptionActive
-                                                ? "text-emerald-500"
-                                                : "text-destructive"
-                                        }`}
-                                    />
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        {isSubscriptionActive
-                                            ? "Expires On"
-                                            : "Expired On"}
-                                    </p>
-                                    <p
-                                        className={`text-sm font-semibold ${
-                                            isSubscriptionActive
-                                                ? "text-foreground"
-                                                : "text-destructive"
-                                        }`}
-                                    >
-                                        {formatDate(
-                                            userData.subscriptionExpiresAt,
-                                        )}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+                                    {active
+                                        ? "Active"
+                                        : expiry
+                                          ? "Expired"
+                                          : "Inactive"}
+                                </span>
+                            )}
+                        </div>
+                        <p className={styles.planPrice}>
+                            {priceFormat.format(price)}
+                            {paid && (
+                                <span className={styles.muted}> / month</span>
+                            )}
+                        </p>
                     </div>
-                </CardContent>
-            </Card>
-
-            {/* AI Credits usage */}
-            <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">
-                    AI Credits
-                </h3>
-                <Card className="border-border/50">
-                    <CardContent className="p-6 space-y-5">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Credits Used
-                                </p>
-                                <p className="text-2xl font-bold text-foreground">
-                                    {userData.creditsUsed.toLocaleString()}
-                                    <span className="text-base font-normal text-muted-foreground">
-                                        {" "}
-                                        /{" "}
-                                        {userData.creditLimit.toLocaleString()}
-                                    </span>
-                                </p>
-                            </div>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div
-                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${
-                                            creditPercentage >= 90
-                                                ? "bg-destructive/10 text-destructive"
-                                                : creditPercentage >= 70
-                                                  ? "bg-amber-500/10 text-amber-500"
-                                                  : "bg-emerald-500/10 text-emerald-500"
-                                        }`}
-                                    >
-                                        {Math.round(creditPercentage)}%
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {creditsRemaining.toLocaleString()} credits
-                                    remaining
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div style={{ transformOrigin: "left" }}>
-                                <Progress
-                                    value={creditPercentage}
-                                    className="h-2.5"
-                                />
-                            </div>
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>
-                                    {creditsRemaining.toLocaleString()}{" "}
-                                    remaining
-                                </span>
-                                <span>
-                                    {userData.creditLimit.toLocaleString()}{" "}
-                                    total
-                                </span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Upload usage */}
-            <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">
-                    Uploads
-                </h3>
-                <Card className="border-border/50">
-                    <CardContent className="p-6 space-y-5">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Uploads This Month
-                                </p>
-                                <p className="text-2xl font-bold text-foreground">
-                                    {userData.uploadCount.toLocaleString()}
-                                    <span className="text-base font-normal text-muted-foreground">
-                                        {" "}
-                                        /{" "}
-                                        {userData.uploadLimit.toLocaleString()}
-                                    </span>
-                                </p>
-                            </div>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div
-                                        className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-semibold ${
-                                            uploadPercentage >= 90
-                                                ? "bg-destructive/10 text-destructive"
-                                                : uploadPercentage >= 70
-                                                  ? "bg-amber-500/10 text-amber-500"
-                                                  : "bg-emerald-500/10 text-emerald-500"
-                                        }`}
-                                    >
-                                        {Math.round(uploadPercentage)}%
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {uploadsRemaining.toLocaleString()} uploads
-                                    remaining
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div style={{ transformOrigin: "left" }}>
-                                <Progress
-                                    value={uploadPercentage}
-                                    className="h-2.5"
-                                />
-                            </div>
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>
-                                    {uploadsRemaining.toLocaleString()}{" "}
-                                    remaining
-                                </span>
-                                <span>
-                                    {userData.uploadLimit.toLocaleString()}{" "}
-                                    total
-                                </span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Quick stats */}
-            <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">
-                    Quick Stats
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {[
-                        {
-                            label: "Credits Left",
-                            value: creditsRemaining.toLocaleString(),
-                            icon: Zap,
-                            color:
-                                creditsRemaining < 100
-                                    ? "text-destructive"
-                                    : "text-emerald-500",
-                            bg:
-                                creditsRemaining < 100
-                                    ? "bg-destructive/10"
-                                    : "bg-emerald-500/10",
-                        },
-                        {
-                            label: "Uploads Left",
-                            value: uploadsRemaining.toLocaleString(),
-                            icon: Sparkles,
-                            color: "text-primary",
-                            bg: "bg-primary/10",
-                        },
-                        {
-                            label: "Plan Tier",
-                            value: userData.plan,
-                            icon: PlanIcon,
-                            color: plan.color,
-                            bg: plan.bg,
-                        },
-                    ].map((stat) => (
-                        <div key={stat.label}>
-                            <Card className="border-border/50 h-full">
-                                <CardContent className="p-5">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div
-                                            className={`h-9 w-9 rounded-lg ${stat.bg} flex items-center justify-center`}
-                                        >
-                                            <stat.icon
-                                                className={`h-4 w-4 ${stat.color}`}
-                                            />
-                                        </div>
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                                            {stat.label}
-                                        </span>
-                                    </div>
-                                    <p className="text-2xl font-bold text-foreground">
-                                        {stat.value}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    ))}
+                    {(plan !== "Pro" || inactive) && (
+                        <Button asChild className={styles.button}>
+                            <Link href="/#pricing">
+                                View plans
+                                <ArrowRight size={16} aria-hidden />
+                            </Link>
+                        </Button>
+                    )}
                 </div>
-            </div>
+                <p className={styles.planAccess}>
+                    {expiry ? (
+                        <>
+                            <CalendarDays size={16} aria-hidden />
+                            <span>
+                                {active
+                                    ? "Access expires on "
+                                    : "Access expired on "}
+                                <AccountDate value={expiry} />
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            <CircleCheck size={16} aria-hidden />
+                            {paid
+                                ? "Choose a plan to restore paid access."
+                                : "No payment required"}
+                        </>
+                    )}
+                </p>
+            </section>
 
-            {/* Upgrade CTA */}
-            {userData.plan !== "Pro" && (
-                <div>
-                    <Card className="border-border/50 overflow-hidden">
-                        <div className="bg-linear-to-br from-primary/5 via-transparent to-primary/5 p-6">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                        <Crown className="h-5 w-5 text-primary" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold text-foreground">
-                                            {userData.plan === "Free"
-                                                ? "Unlock AI features with a plan"
-                                                : "Upgrade for more credits and uploads"}
-                                        </h4>
-                                        <p className="text-sm text-muted-foreground">
-                                            Get access to all features and
-                                            higher limits
-                                        </p>
-                                    </div>
-                                </div>
-                                <Button
-                                    className="cursor-pointer gap-1 shrink-0"
-                                    onClick={() => {
-                                        window.location.href = "/#pricing";
-                                    }}
-                                >
-                                    View Plans
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </Card>
+            <section
+                className={styles.usageSection}
+                aria-labelledby="usage-title"
+            >
+                <h3 id="usage-title">
+                    {inactive ? "Previous plan usage" : "Monthly usage"}
+                </h3>
+                <div className={`${styles.panel} ${styles.usageGrid}`}>
+                    <UsageMetric
+                        label="AI credits"
+                        Icon={Zap}
+                        used={account.creditsUsed}
+                        limit={account.creditLimit}
+                        inactive={inactive}
+                        empty="Included with paid plans."
+                    />
+                    <UsageMetric
+                        label="Uploads"
+                        Icon={ImagePlus}
+                        used={account.uploadCount}
+                        limit={account.uploadLimit}
+                        inactive={inactive}
+                        empty="There’s no upload allowance on this plan."
+                    />
                 </div>
+            </section>
+        </>
+    );
+}
+
+function UsageMetric({
+    label,
+    Icon,
+    used,
+    limit,
+    inactive,
+    empty,
+}: {
+    label: string;
+    Icon: typeof Zap;
+    used: number;
+    limit: number;
+    inactive: boolean;
+    empty: string;
+}) {
+    const remaining = Math.max(0, limit - used);
+    const percent =
+        limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
+    const usageText = `${numberFormat.format(used)} of ${numberFormat.format(limit)} used`;
+
+    return (
+        <div className={styles.usageMetric}>
+            <p className={styles.usageLabel}>
+                <Icon size={16} aria-hidden />
+                {label}
+            </p>
+            {limit > 0 ? (
+                <>
+                    <p className={styles.usageValue}>
+                        <strong>
+                            {numberFormat.format(inactive ? used : remaining)}
+                        </strong>
+                        <span className={styles.muted}>
+                            {inactive ? "used" : "remaining"}
+                        </span>
+                    </p>
+                    <Progress
+                        aria-label={`${label} used`}
+                        getValueLabel={() => usageText}
+                        value={percent}
+                        className={styles.meter}
+                        data-full={percent === 100 || undefined}
+                    />
+                    <p className={styles.usageCaption}>
+                        {inactive
+                            ? `of ${numberFormat.format(limit)} available`
+                            : usageText}
+                    </p>
+                </>
+            ) : (
+                <p className={styles.muted}>{empty}</p>
             )}
         </div>
     );

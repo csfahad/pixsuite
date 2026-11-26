@@ -17,6 +17,9 @@ export default function Navbar() {
 
     const router = useRouter();
     const pathname = usePathname();
+    if (pathname === "/signin" || pathname === "/signin/") return null;
+
+    const showSignIn = sessionStatus !== "loading" && !session?.user;
 
     const scrollToSection = (sectionId: string) => {
         trackEvent("navigation_selected", {
@@ -113,10 +116,10 @@ export default function Navbar() {
                             </Link>
                         </div>
                         <div className="hidden items-center justify-end gap-3 lg:flex">
-                            {sessionStatus ===
-                            "loading" ? null : session?.user ? (
+                            {sessionStatus !== "loading" && session?.user && (
                                 <UserInfo />
-                            ) : (
+                            )}
+                            {showSignIn && (
                                 <Button
                                     variant="default"
                                     className="shrink-0 cursor-pointer px-4"
@@ -211,21 +214,20 @@ export default function Navbar() {
                                     </Link>
                                 </div>
 
-                                {sessionStatus !== "loading" &&
-                                    !session?.user && (
-                                        <div className="border-t border-border/70 pt-5">
-                                            <Button
-                                                variant="default"
-                                                className="w-full"
-                                                onClick={() => {
-                                                    router.push("/signin");
-                                                    setMenuState(false);
-                                                }}
-                                            >
-                                                Sign In
-                                            </Button>
-                                        </div>
-                                    )}
+                                {showSignIn && (
+                                    <div className="border-t border-border/70 pt-5">
+                                        <Button
+                                            variant="default"
+                                            className="w-full"
+                                            onClick={() => {
+                                                router.push("/signin");
+                                                setMenuState(false);
+                                            }}
+                                        >
+                                            Sign In
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
