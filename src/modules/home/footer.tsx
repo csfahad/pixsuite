@@ -4,7 +4,13 @@ import Link from "@/components/navigation-link";
 import ModeToggle from "@/components/modeToggle";
 import styles from "./home.module.css";
 
-export default function HomeFooter() {
+export default function HomeFooter({
+    pricingHref = "#pricing",
+    topHref = "#hero",
+}: {
+    pricingHref?: string;
+    topHref?: string;
+} = {}) {
     return (
         <footer className={styles.footer}>
             <div className={styles.container}>
@@ -35,7 +41,7 @@ export default function HomeFooter() {
                         <Link href="/editor">
                             Open editor <ArrowUpRight size={14} aria-hidden />
                         </Link>
-                        <a href="#pricing">Plans & pricing</a>
+                        <Link href={pricingHref}>Plans & pricing</Link>
                     </nav>
                     <nav
                         aria-label="Footer support navigation"
@@ -52,7 +58,7 @@ export default function HomeFooter() {
                     <div className={styles.footerUtilities}>
                         <ModeToggle />
                         <a
-                            href="#hero"
+                            href={topHref}
                             aria-label="Back to top"
                             title="Back to top"
                         >

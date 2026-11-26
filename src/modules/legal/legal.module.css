@@ -1,0 +1,223 @@
+.page {
+    padding: 144px 24px 96px;
+}
+
+.container {
+    max-width: 896px;
+    margin-inline: auto;
+}
+
+.page a:focus-visible {
+    outline: 2px solid var(--home-accent);
+    outline-offset: 4px;
+    border-radius: 3px;
+}
+
+.header {
+    padding-bottom: 48px;
+    margin-bottom: 56px;
+    border-bottom: 1px solid var(--home-line);
+}
+
+.header h1 {
+    font-size: clamp(40px, 4vw, 56px);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+}
+
+.header > p {
+    max-width: 55ch;
+    margin-top: 18px;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--home-muted);
+    text-wrap: pretty;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 216px minmax(0, 1fr);
+    align-items: start;
+    gap: 40px;
+}
+
+.contents {
+    position: sticky;
+    top: 108px;
+}
+
+.contentsTitle {
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.contents ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.contents a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding-block: 8px;
+    color: var(--home-muted);
+    font-size: 14px;
+    line-height: 1.5;
+    text-wrap: pretty;
+}
+
+.contents a:hover {
+    color: var(--home-accent);
+}
+
+.document {
+    min-width: 0;
+    max-width: 72ch;
+}
+
+.section {
+    scroll-margin-top: 108px;
+}
+
+.section + .section {
+    padding-top: 36px;
+    margin-top: 36px;
+    border-top: 1px solid var(--home-line);
+}
+
+.section h2 {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+}
+
+.section p {
+    margin-top: 16px;
+    font-size: 16px;
+    line-height: 1.8;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+}
+
+.section a {
+    color: var(--home-accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    overflow-wrap: anywhere;
+}
+
+.section a:hover {
+    color: var(--home-ink);
+}
+
+.related {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--home-line);
+}
+
+.related a {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.related a:hover {
+    color: var(--home-accent);
+}
+
+.related svg {
+    flex-shrink: 0;
+}
+
+@media (max-width: 1023px) {
+    .page {
+        padding-top: 120px;
+    }
+}
+
+@media (max-width: 900px) {
+    .header {
+        padding-bottom: 32px;
+        margin-bottom: 32px;
+    }
+
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    .contents {
+        position: static;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--home-line);
+    }
+
+    .contentsTitle {
+        margin-bottom: 8px;
+    }
+
+    .contents ol {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 24px;
+    }
+}
+
+@media (max-width: 639px) {
+    .page {
+        padding: 112px 24px 64px;
+    }
+
+    .header h1 {
+        font-size: 38px;
+    }
+
+    .header > p {
+        margin-top: 16px;
+        font-size: 14px;
+    }
+
+    .contents a {
+        font-size: 13px;
+    }
+
+    .contents ol {
+        column-gap: 16px;
+    }
+
+    .section {
+        scroll-margin-top: 88px;
+    }
+
+    .section + .section {
+        padding-top: 28px;
+        margin-top: 28px;
+    }
+
+    .section h2 {
+        font-size: 20px;
+    }
+
+    .section p {
+        margin-top: 14px;
+        font-size: 15px;
+        line-height: 1.75;
+    }
+
+    .related {
+        margin-top: 36px;
+        padding-top: 20px;
+    }
+}
