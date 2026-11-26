@@ -637,9 +637,9 @@ export default function Editor() {
                     duration_ms: Math.round(performance.now() - startedAt),
                 });
                 console.error("Error applying effect:", err);
-                toast.error(
-                    "Failed to apply transformation. Please try again.",
-                );
+                toast.error("Edit couldn’t be applied", {
+                    description: "Try applying the edit again.",
+                });
                 setCurrentJob((prev) =>
                     prev ? { ...prev, status: "error" } : null,
                 );
@@ -676,18 +676,10 @@ export default function Editor() {
                     reason: "http_error",
                     status_code: response.status,
                 });
-                // try to read error message from imagekit
-                const contentType = response.headers.get("content-type") || "";
-                if (contentType.includes("text")) {
-                    const errorText = await response.text();
-                    toast.error(
-                        errorText || "Transformation failed. Please try again.",
-                    );
-                } else {
-                    toast.error(
-                        "Download failed. The transformation may have encountered an error.",
-                    );
-                }
+                toast.error("Download failed", {
+                    description:
+                        "The edited image couldn’t be retrieved. Try downloading it again.",
+                });
                 return;
             }
             // verify we got an actual image, not an error page
@@ -697,10 +689,10 @@ export default function Editor() {
                     ...exportProperties,
                     reason: "unexpected_response",
                 });
-                const errorText = await response.text();
-                toast.error(
-                    errorText || "Transformation failed. Please try again.",
-                );
+                toast.error("Download failed", {
+                    description:
+                        "The edited image wasn’t available. Try applying the edit again.",
+                });
                 return;
             }
             const blob = await response.blob();
@@ -720,9 +712,9 @@ export default function Editor() {
                 reason: "network_error",
             });
             console.error("Export error:", err);
-            toast.error(
-                "Failed to download. Please check your connection and try again.",
-            );
+            toast.error("Download failed", {
+                description: "Check your connection and try again.",
+            });
         } finally {
             exportInFlight.current = false;
             setExportingFormat(null);

@@ -52,10 +52,10 @@ export default function RootLayout({
                     <Provider>
                         <Navbar />
                         {children}
-                        <Toaster richColors />
                         <Analytics />
                         <SpeedInsights />
                     </Provider>
+                    <Toaster />
                 </ThemeProvider>
             </body>
         </html>

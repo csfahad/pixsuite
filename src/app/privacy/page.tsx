@@ -51,8 +51,8 @@ const sections: readonly LegalSection[] = [
         content: (
             <p>
                 We may use third-party service providers to help us provide our
-                services, such as payment processors (e.g., Razorpay) and cloud
-                storage providers. These third parties may have access to your
+                services, such as payment processors and cloud storage
+                providers. These third parties may have access to your
                 information only to perform tasks on our behalf and are
                 obligated not to disclose or use it for any other purpose.
             </p>
