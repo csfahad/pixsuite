@@ -137,7 +137,9 @@ export default function Pricing() {
             }).catch(() => {
                 setSigningInPlan(null);
                 finish(feedbackToken);
-                toast.error("Sign-in couldn’t open. Please try again.");
+                toast.error("Google sign-in couldn’t open", {
+                    description: "Try choosing the plan again.",
+                });
             });
             return;
         }
@@ -201,9 +203,10 @@ export default function Pricing() {
         return true;
     };
 
-    const handlePaymentModalClose = () => {
+    const handlePaymentModalClose = (reason: "dismissed" | "checkout") => {
         setShowPaymentModal(false);
-        setUsageRevision((revision) => revision + 1);
+        if (reason === "dismissed")
+            setUsageRevision((revision) => revision + 1);
     };
 
     const getDisplayPrice = (plan: (typeof plans)[0]) => {
@@ -360,9 +363,7 @@ export default function Pricing() {
             <PaymentModal
                 isOpen={showPaymentModal}
                 onClose={handlePaymentModalClose}
-                onUpgrade={handlePaymentModalClose}
                 creditsRemaining={usageData?.creditsRemaining ?? 0}
-                creditLimit={usageData?.creditLimit ?? 0}
                 uploadCount={usageData?.uploadCount ?? 0}
                 uploadLimit={usageData?.uploadLimit ?? 3}
                 plan={selectedPlan}

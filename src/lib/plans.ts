@@ -18,7 +18,13 @@ export const FEATURE_MIN_PLAN: Record<string, PlanType> = {
     "e-removedotbg": "Lite",
 };
 
-export type PlanType = "Free" | "Starter" | "Lite" | "Pro";
+export const PAID_PLANS = ["Starter", "Lite", "Pro"] as const;
+export type PaidPlan = (typeof PAID_PLANS)[number];
+export type PlanType = "Free" | PaidPlan;
+
+export function isPaidPlan(plan: unknown): plan is PaidPlan {
+    return PAID_PLANS.some((paidPlan) => plan === paidPlan);
+}
 
 const PLAN_RANK: Record<PlanType, number> = {
     Free: 0,
@@ -57,8 +63,6 @@ export const PLAN_PRICES_PAISE: Record<"Starter" | "Lite" | "Pro", number> = {
     Lite: 269900, // ₹2,699
     Pro: 549900, // ₹5,499
 };
-
-type PaidPlan = "Starter" | "Lite" | "Pro";
 
 export function getUpgradeAmount(fromPlan: PlanType, toPlan: PaidPlan): number {
     const toPrice = PLAN_PRICES_PAISE[toPlan];

@@ -14,7 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PaymentModal from "@/components/modals/payment-modal";
-import type { PlanType } from "@/lib/plans";
+import {
+    isPaidPlan,
+    isUpgrade,
+    PAID_PLANS,
+    type PaidPlan,
+    type PlanType,
+} from "@/lib/plans";
 import { setAnalyticsPlan, trackEvent } from "@/lib/analytics";
 
 interface UploadZoneProps {
@@ -53,9 +59,7 @@ export default function UploadZone({
     const uploadInFlight = useRef(false);
     const searchParams = useSearchParams();
     const router = useRouter();
-    const [selectedPlan, setSelectedPlan] = useState<
-        "Starter" | "Lite" | "Pro"
-    >("Starter");
+    const [selectedPlan, setSelectedPlan] = useState<PaidPlan | null>(null);
 
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -63,7 +67,6 @@ export default function UploadZone({
     const [checkingUsage, setCheckingUsage] = useState(true);
     const [usageError, setUsageError] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [usageData, setUsageData] = useState<UsageData | null>(null);
 
     const checkUsage = useCallback(async () => {
@@ -131,19 +134,16 @@ export default function UploadZone({
 
     useEffect(() => {
         const upgradePlan = searchParams.get("showUpgrade");
-        if (upgradePlan && isAuthenticated) {
+        if (isAuthenticated && isPaidPlan(upgradePlan)) {
             router.replace("/editor", { scroll: false });
 
             fetch("/api/usage")
-                .then((res) => res.json())
+                .then((res) => (res.ok ? res.json() : null))
                 .then((data) => {
+                    if (!data) return;
                     setUsageData(data);
-                    const currentPlan = data?.plan || "Free";
-                    if (currentPlan === "Free") {
-                        setSelectedPlan(
-                            upgradePlan as "Starter" | "Lite" | "Pro",
-                        );
-                        setShowPaymentModal(true);
+                    if (isUpgrade(data.plan, upgradePlan)) {
+                        setSelectedPlan(upgradePlan);
                     }
                 })
                 .catch(console.error);
@@ -182,7 +182,11 @@ export default function UploadZone({
                 plan: data.plan || "Free",
             });
             setUsageData(data);
-            setShowPaymentModal(true);
+            const nextPlan = PAID_PLANS.find((plan) =>
+                isUpgrade(data.plan ?? "Free", plan),
+            );
+            if (nextPlan) setSelectedPlan(nextPlan);
+            else setUploadError("You’ve reached your monthly upload limit.");
             return null;
         }
         if (!response.ok) throw new Error("Failed to authorize upload");
@@ -284,8 +288,9 @@ export default function UploadZone({
         }
     };
 
-    const handlePaymentModalClose = () => {
-        setShowPaymentModal(false);
+    const handlePaymentModalClose = (reason: "dismissed" | "checkout") => {
+        setSelectedPlan(null);
+        if (reason === "checkout") return;
         if (isAuthenticated) {
             checkUsage().catch(console.error);
         } else {
@@ -535,23 +540,15 @@ export default function UploadZone({
                 </div>
             )}
 
-            {/* Payment Modal */}
             <PaymentModal
-                isOpen={showPaymentModal}
+                isOpen={selectedPlan !== null}
                 onClose={handlePaymentModalClose}
-                onUpgrade={() => {
-                    handlePaymentModalClose();
-                    if (isAuthenticated) {
-                        checkUsage().catch(console.error);
-                    }
-                }}
                 creditsRemaining={
                     updatedCreditsRemaining ?? usageData?.creditsRemaining ?? 0
                 }
-                creditLimit={usageData?.creditLimit ?? 0}
                 uploadCount={usageData?.uploadCount ?? 0}
                 uploadLimit={usageData?.uploadLimit ?? 3}
-                plan={selectedPlan}
+                plan={selectedPlan ?? undefined}
                 currentPlan={(usageData?.plan as PlanType) || "Free"}
                 isAuthenticated={isAuthenticated}
             />
