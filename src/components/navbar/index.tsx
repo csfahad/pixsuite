@@ -1,42 +1,22 @@
 "use client";
-import {
-    BadgeCheckIcon,
-    CreditCardIcon,
-    ImagePlus,
-    LogOutIcon,
-    Menu,
-    X,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { Menu, X } from "lucide-react";
+import { useState } from "react";
+import { useSession } from "next-auth/react";
 import Link from "@/components/navigation-link";
-import { useNavigationFeedback } from "@/components/navigation-feedback";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAppRouter as useRouter } from "@/components/navigation-feedback";
 import { usePathname } from "next/navigation";
 import UserInfo from "./user-info";
 import { BrandLogo } from "@/components/brand/logo";
-import { trackEvent, trackSignOut } from "@/lib/analytics";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Navbar() {
     const [menuState, setMenuState] = useState(false);
-    const [scrolled, setScrolled] = useState(false);
 
     const { data: session, status: sessionStatus } = useSession();
-    const [signingOut, setSigningOut] = useState(false);
-    const { beginAction, finish } = useNavigationFeedback();
 
     const router = useRouter();
     const pathname = usePathname();
-
-    useEffect(() => {
-        const updateHeader = () => setScrolled(window.scrollY > 24);
-        updateHeader();
-        window.addEventListener("scroll", updateHeader, { passive: true });
-        return () => window.removeEventListener("scroll", updateHeader);
-    }, []);
 
     const scrollToSection = (sectionId: string) => {
         trackEvent("navigation_selected", {
@@ -66,38 +46,6 @@ export default function Navbar() {
         setMenuState(false);
     };
 
-    const handleSubmit = async () => {
-        trackEvent("navigation_selected", {
-            destination: "/editor",
-            source: "navbar",
-        });
-        router.push("/editor");
-    };
-
-    const profileImage = session?.user?.image || session?.user?.avatar || "";
-
-    const getInitials = (name: string | null | undefined) => {
-        if (!name) return "U";
-        const names = name.split(" ");
-        return names.length >= 2
-            ? `${names[0][0]}${names[1][0]}`.toUpperCase()
-            : name.substring(0, 2).toUpperCase();
-    };
-
-    const handleSignOut = async () => {
-        if (signingOut) return;
-        setSigningOut(true);
-        trackSignOut();
-        const token = beginAction("Signing out…");
-        try {
-            await signOut({ callbackUrl: "/" });
-        } catch {
-            finish(token);
-            setSigningOut(false);
-            toast.error("Couldn’t sign out. Try again.");
-        }
-    };
-
     return (
         <header>
             <nav
@@ -117,31 +65,23 @@ export default function Navbar() {
                                     aria-hidden="true"
                                 />
                             </Link>
-
-                            <div className="flex items-center gap-2 lg:hidden">
-                                <button
-                                    onClick={() => {
-                                        trackEvent("navigation_menu_toggled", {
-                                            open: !menuState,
-                                        });
-                                        setMenuState(!menuState);
-                                    }}
-                                    aria-label={
-                                        menuState == true
-                                            ? "Close Menu"
-                                            : "Open Menu"
-                                    }
-                                    aria-expanded={menuState}
-                                    aria-controls="mobile-navigation"
-                                    className="relative z-20 -m-2.5 -mr-4 block cursor-pointer p-2.5"
-                                >
-                                    {menuState ? (
-                                        <X className="m-auto size-6" />
-                                    ) : (
-                                        <Menu className="m-auto size-6" />
-                                    )}
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    trackEvent("navigation_menu_toggled", {
+                                        open: true,
+                                    });
+                                    setMenuState(true);
+                                }}
+                                aria-label="Open Menu"
+                                aria-expanded={menuState}
+                                aria-controls={
+                                    menuState ? "mobile-navigation" : undefined
+                                }
+                                className="relative z-20 -m-2.5 -mr-4 block cursor-pointer rounded-lg p-2.5 focus-visible:outline-2 focus-visible:outline-ring lg:hidden"
+                            >
+                                <Menu className="m-auto size-6" aria-hidden />
+                            </button>
                         </div>
 
                         <div className="hidden items-center justify-center gap-6 lg:flex">
@@ -179,7 +119,7 @@ export default function Navbar() {
                             ) : (
                                 <Button
                                     variant="default"
-                                    className="cursor-pointer px-4 shrink-0"
+                                    className="shrink-0 cursor-pointer px-4"
                                     onClick={() => router.push("/signin")}
                                 >
                                     Sign In
@@ -223,6 +163,15 @@ export default function Navbar() {
                             </div>
 
                             <div className="mt-4 space-y-4">
+                                {sessionStatus !== "loading" &&
+                                    session?.user && (
+                                        <UserInfo
+                                            onMobileNavigate={() =>
+                                                setMenuState(false)
+                                            }
+                                        />
+                                    )}
+
                                 <div className="space-y-2">
                                     <button
                                         type="button"
@@ -262,122 +211,21 @@ export default function Navbar() {
                                     </Link>
                                 </div>
 
-                                <div className="h-px w-full bg-border/70" />
-
-                                {sessionStatus ===
-                                "loading" ? null : session?.user ? (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3 px-1">
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarImage
-                                                    src={profileImage}
-                                                    alt={
-                                                        session?.user?.name ||
-                                                        "User"
-                                                    }
-                                                    referrerPolicy="no-referrer"
-                                                />
-                                                <AvatarFallback>
-                                                    {getInitials(
-                                                        session?.user?.name,
-                                                    )}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-semibold text-foreground">
-                                                    {session?.user?.name}
-                                                </span>
-                                                {session?.user?.email && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {session.user.email}
-                                                    </span>
-                                                )}
-                                            </div>
+                                {sessionStatus !== "loading" &&
+                                    !session?.user && (
+                                        <div className="border-t border-border/70 pt-5">
+                                            <Button
+                                                variant="default"
+                                                className="w-full"
+                                                onClick={() => {
+                                                    router.push("/signin");
+                                                    setMenuState(false);
+                                                }}
+                                            >
+                                                Sign In
+                                            </Button>
                                         </div>
-
-                                        <div className="space-y-1 text-sm font-medium text-foreground/90">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    handleSubmit();
-                                                    setMenuState(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-muted/70"
-                                            >
-                                                <ImagePlus className="h-4 w-4" />
-                                                <span>Launch Editor</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    trackEvent(
-                                                        "navigation_selected",
-                                                        {
-                                                            destination:
-                                                                "/account",
-                                                            source: "mobile_menu",
-                                                        },
-                                                    );
-                                                    router.push("/account");
-                                                    setMenuState(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-muted/70"
-                                            >
-                                                <BadgeCheckIcon className="h-4 w-4" />
-                                                <span>Account</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    trackEvent(
-                                                        "navigation_selected",
-                                                        {
-                                                            destination:
-                                                                "/account?tab=plan",
-                                                            source: "mobile_menu",
-                                                        },
-                                                    );
-                                                    router.push(
-                                                        "/account?tab=plan",
-                                                    );
-                                                    setMenuState(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-muted/70"
-                                            >
-                                                <CreditCardIcon className="h-4 w-4" />
-                                                <span>Billing</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    handleSignOut();
-                                                    setMenuState(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-destructive hover:bg-destructive/10"
-                                            >
-                                                <LogOutIcon className="h-4 w-4" />
-                                                <span>
-                                                    {signingOut
-                                                        ? "Signing out…"
-                                                        : "Sign Out"}
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="pt-2">
-                                        <Button
-                                            variant="default"
-                                            className="w-full"
-                                            onClick={() => {
-                                                router.push("/signin");
-                                                setMenuState(false);
-                                            }}
-                                        >
-                                            Sign In
-                                        </Button>
-                                    </div>
-                                )}
+                                    )}
                             </div>
                         </div>
                     </div>
